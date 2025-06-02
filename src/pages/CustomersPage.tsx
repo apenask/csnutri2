@@ -1,18 +1,15 @@
-import React, { useState, useMemo } from 'react'; // Removido useEffect
-// CORREÇÃO: Adicionado 'Users' (plural) à importação se for usado. 'User' (singular) já estava.
-import { Plus, Search, Edit, Trash2, User, Users, Phone, Mail, Eye } from 'lucide-react'; 
+import React, { useState, useMemo, useEffect } from 'react'; 
+import { Plus, Search, Edit, Trash2, User, Users, Phone, Mail, Eye, RefreshCw } from 'lucide-react'; // Adicionado RefreshCw
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { Customer, Sale } from '../types'; // CORREÇÃO: Removido Product da importação de tipos
+import { Customer, Sale } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useSales } from '../context/SaleContext'; 
 import { useProducts } from '../context/ProductContext';
 import { format, parseISO } from 'date-fns';
-
-// Tipagem para a linha de dados do relatório de cliente (inclui campos calculados)
-
+import ConfirmationModal from '../components/ui/ConfirmationModal'; 
 
 const CustomersPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -23,12 +20,12 @@ const CustomersPage: React.FC = () => {
     addCustomer, 
     updateCustomer, 
     deleteCustomer, 
-    isLoading: isLoadingCustomers 
+    isLoading: isLoadingCustomers,
+    getCustomerById: getCustomerFromContextById // Renomeado para evitar conflito
   } = useCustomers();
 
   const { getSalesByCustomerId, isLoading: isLoadingSales } = useSales();
   const { getProductById, isLoading: isLoadingProducts } = useProducts(); 
-
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -38,12 +35,36 @@ const CustomersPage: React.FC = () => {
   const [customerSalesHistory, setCustomerSalesHistory] = useState<Sale[]>([]);
 
   const [formData, setFormData] = useState<Partial<Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent'>>>({
-    name: '', phone: '', email: '', address: '', category: '',
+    name: '', phone: '', email: '', address: '', customCategory: '', 
   });
-  const [error, setError] = useState<string>('');
+  
+  const [formError, setFormError] = useState<string>(''); 
+  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false); // Estado para o botão de recalcular
+
+  const [showDeleteCustomerModal, setShowDeleteCustomerModal] = useState(false); 
+  const [customerIdToDelete, setCustomerIdToDelete] = useState<string | null>(null);
 
   const isLoading = isLoadingCustomers || isLoadingSales || isLoadingProducts;
+
+  useEffect(() => {
+    if (pageMessage) {
+      const timer = setTimeout(() => setPageMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageMessage]);
+
+  // Efeito para atualizar currentCustomer se ele mudar no contexto (após recalcular)
+  useEffect(() => {
+    if (currentCustomer && currentCustomer.id) {
+      const updatedCustomerFromContext = getCustomerFromContextById(currentCustomer.id);
+      if (updatedCustomerFromContext) {
+        setCurrentCustomer(updatedCustomerFromContext);
+      }
+    }
+  }, [customersFromContext, currentCustomer?.id, getCustomerFromContextById]);
+
 
   const filteredCustomers = useMemo(() => {
     if (isLoadingCustomers) return [];
@@ -60,26 +81,29 @@ const CustomersPage: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
-    setError('');
-    setFormData({ name: '', phone: '', email: '', address: '', category: '' });
+    setFormError('');
+    setPageMessage(null);
+    setFormData({ name: '', phone: '', email: '', address: '', customCategory: '' });
     setCurrentCustomer(null);
     setShowAddModal(true);
   };
 
   const handleEdit = (customer: Customer) => {
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     setCurrentCustomer(customer);
     setFormData({
         name: customer.name || '',
         phone: customer.phone || '',
         email: customer.email || '',
         address: customer.address || '',
-        category: customer.category || '',
+        customCategory: customer.customCategory || '', 
     });
     setShowEditModal(true);
   };
 
   const handleView = (customer: Customer) => {
+    setPageMessage(null);
     setCurrentCustomer(customer);
     if (!isLoadingSales && !isLoadingProducts) {
         const salesHistory = getSalesByCustomerId(customer.id);
@@ -88,35 +112,43 @@ const CustomersPage: React.FC = () => {
     setShowViewModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      setIsSubmitting(true);
-      try {
-        await deleteCustomer(id);
-      } catch (err) {
-        console.error("Erro ao deletar cliente:", err);
-        setError(err instanceof Error ? err.message : 'Erro ao deletar cliente');
-      } finally {
-        setIsSubmitting(false);
-      }
+  const requestDeleteCustomer = (id: string) => {
+    setPageMessage(null);
+    setCustomerIdToDelete(id);
+    setShowDeleteCustomerModal(true); 
+  };
+
+  const confirmDeleteCustomer = async () => {
+    if (!customerIdToDelete) return;
+    setIsSubmitting(true);
+    setPageMessage(null);
+    try {
+      await deleteCustomer(customerIdToDelete);
+      setPageMessage({type: 'success', text: 'Cliente excluído com sucesso!'});
+    } catch (err) {
+      console.error("Erro ao deletar cliente:", err);
+      setPageMessage({type: 'error', text: err instanceof Error ? err.message : 'Erro ao deletar cliente'});
+    } finally {
+      setIsSubmitting(false);
+      setShowDeleteCustomerModal(false); 
+      setCustomerIdToDelete(null);
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
+    setFormError('');
+    setPageMessage(null);
+    
     if (!formData.name || !formData.phone) {
-        setError('Nome e Telefone são obrigatórios.');
-        setIsSubmitting(false);
+        setFormError('Nome e Telefone são obrigatórios.');
         return;
     }
-    if (!formData.email) { 
-        setError('Email é obrigatório.');
-        setIsSubmitting(false);
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) { 
+        setFormError('Email é obrigatório e deve ser válido.');
         return;
     }
+    setIsSubmitting(true);
 
     try {
       const customerDataPayload = {
@@ -124,23 +156,67 @@ const CustomersPage: React.FC = () => {
         phone: formData.phone!,
         email: formData.email!, 
         address: formData.address,
-        category: formData.category,
+        customCategory: formData.customCategory, 
       };
 
       if (showEditModal && currentCustomer) {
         await updateCustomer(currentCustomer.id, customerDataPayload);
         setShowEditModal(false);
+        setPageMessage({type: 'success', text: 'Cliente atualizado com sucesso!'});
       } else {
-        await addCustomer(customerDataPayload);
+        const payloadForAdd: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent'> = {
+            ...customerDataPayload,
+        };
+        await addCustomer(payloadForAdd);
         setShowAddModal(false);
+        setPageMessage({type: 'success', text: 'Cliente adicionado com sucesso!'});
       }
-      setFormData({ name: '', phone: '', email: '', address: '', category: '' });
+      setFormData({ name: '', phone: '', email: '', address: '', customCategory: '' });
       setCurrentCustomer(null);
     } catch (err) {
       console.error("Erro ao salvar cliente:", err);
-      setError(err instanceof Error ? err.message : 'Erro ao salvar cliente');
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao salvar cliente.';
+      setFormError(errorMessage); 
+      setPageMessage({type: 'error', text: errorMessage}); 
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRecalculateCustomerTotals = async () => {
+    if (!currentCustomer || isLoadingSales) return;
+    setIsRecalculating(true);
+    setPageMessage(null);
+    try {
+      const customerSales = getSalesByCustomerId(currentCustomer.id);
+      let newTotalSpent = 0;
+      let newTotalPurchases = 0;
+      let newPoints = 0;
+
+      customerSales.forEach(sale => {
+        newTotalSpent += sale.total;
+        newTotalPurchases += 1;
+        newPoints += sale.pointsEarned || 0;
+      });
+
+      await updateCustomer(currentCustomer.id, {
+        totalSpent: newTotalSpent,
+        totalPurchases: newTotalPurchases,
+        points: newPoints,
+      });
+      
+      // Força a atualização do currentCustomer no modal buscando os dados mais recentes do contexto
+      const updatedCustomer = getCustomerFromContextById(currentCustomer.id);
+      if (updatedCustomer) {
+        setCurrentCustomer(updatedCustomer);
+      }
+
+      setPageMessage({ type: 'success', text: 'Totais do cliente recalculados com sucesso!' });
+    } catch (error) {
+      console.error("Erro ao recalcular totais do cliente:", error);
+      setPageMessage({ type: 'error', text: 'Falha ao recalcular totais.' });
+    } finally {
+      setIsRecalculating(false);
     }
   };
   
@@ -162,9 +238,9 @@ const CustomersPage: React.FC = () => {
   
   const getLastPurchaseDate = (customerId: string): string | undefined => {
     if (isLoadingSales) return undefined;
-    const customerSales = getSalesByCustomerId(customerId); // Renomeada variável local para evitar conflito de nome
-    if (customerSales.length === 0) return undefined;
-    return customerSales.sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())[0].date;
+    const customerSalesData = getSalesByCustomerId(customerId); 
+    if (customerSalesData.length === 0) return undefined;
+    return customerSalesData.sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime())[0].date;
   }
 
   if (isLoading) {
@@ -187,6 +263,12 @@ const CustomersPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {pageMessage && (
+        <div className={`mb-4 p-3 rounded-md text-sm transition-opacity duration-300 ${pageMessage.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+          {pageMessage.text}
+        </div>
+      )}
       
       <Card className="mb-6" transparentDarkBg={true}>
         <div className="p-3 md:p-4">
@@ -254,7 +336,7 @@ const CustomersPage: React.FC = () => {
                         {isAdmin && (
                           <>
                             <Button variant="outline" size="sm" onClick={() => handleEdit(customer)} disabled={isSubmitting} className="px-2 py-1"><Edit size={16} /></Button>
-                            <Button variant="danger" size="sm" onClick={() => handleDelete(customer.id)} disabled={isSubmitting} className="px-2 py-1"><Trash2 size={16} /></Button>
+                            <Button variant="danger" size="sm" onClick={() => requestDeleteCustomer(customer.id)} disabled={isSubmitting} className="px-2 py-1"><Trash2 size={16} /></Button>
                           </>
                         )}
                       </td>
@@ -263,7 +345,6 @@ const CustomersPage: React.FC = () => {
                 })
               ) : (
                 <tr>
-                  {/* CORREÇÃO: Usando o ícone Users (plural) que foi importado */}
                   <td colSpan={5} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">
                     <Users size={40} className="mx-auto mb-2 text-gray-400 dark:text-gray-500"/>
                     Nenhum cliente encontrado.
@@ -278,14 +359,14 @@ const CustomersPage: React.FC = () => {
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-black dark:bg-opacity-75 transition-opacity" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setError('');}}}></div>
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-black dark:bg-opacity-75 transition-opacity" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setFormError('');}}}></div>
             <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
             <form onSubmit={handleSave} className="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
               <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4">
                   {showEditModal ? 'Editar Cliente' : 'Novo Cliente'}
                 </h3>
-                {error && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{error}</p>}
+                {formError && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{formError}</p>}
                 <div className="grid grid-cols-1 gap-y-4 gap-x-4">
                   <Input label="Nome Completo" type="text" name="name" id="name" required value={formData.name || ''} onChange={handleInputChange} fullWidth/>
                   <Input label="Telefone" type="text" name="phone" id="phone" required value={formData.phone || ''} onChange={handleInputChange} fullWidth/>
@@ -300,7 +381,7 @@ const CustomersPage: React.FC = () => {
               </div>
               <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
                 <Button type="submit" className="sm:ml-3" isLoading={isSubmitting} disabled={isSubmitting}>{showEditModal ? 'Salvar Alterações' : 'Adicionar Cliente'}</Button>
-                <Button type="button" variant="outline" className="mt-3 sm:mt-0" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setError('');}}} disabled={isSubmitting}>Cancelar</Button>
+                <Button type="button" variant="outline" className="mt-3 sm:mt-0" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setFormError('');}}} disabled={isSubmitting}>Cancelar</Button>
               </div>
             </form>
           </div>
@@ -314,7 +395,22 @@ const CustomersPage: React.FC = () => {
             <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
             <div className="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-3xl sm:align-middle">
               <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <h3 className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100 mb-4">Detalhes do Cliente</h3>
+                <div className="flex justify-between items-start">
+                  <h3 className="text-lg font-semibold leading-6 text-gray-900 dark:text-gray-100 mb-4">Detalhes do Cliente</h3>
+                  {isAdmin && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleRecalculateCustomerTotals} 
+                      isLoading={isRecalculating} 
+                      disabled={isRecalculating || isLoadingSales}
+                      className="ml-auto"
+                    >
+                      <RefreshCw size={14} className="mr-2" />
+                      Recalcular Totais
+                    </Button>
+                  )}
+                </div>
                 <div className="bg-gray-50 dark:bg-gray-700/30 rounded-lg p-4 mb-6 space-y-3">
                   <div className="flex items-center">
                     <div className="h-12 w-12 flex-shrink-0 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center"><User size={24} className="text-red-600 dark:text-red-300" /></div>
@@ -359,7 +455,7 @@ const CustomersPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap hidden sm:table-cell">
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 dark:bg-green-800/40 text-green-800 dark:text-green-300">
-                                {sale.paymentMethod.charAt(0).toUpperCase() + sale.paymentMethod.slice(1)}
+                                {sale.payments.map(p => p.method.charAt(0).toUpperCase() + p.method.slice(1)).join(', ')}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-800 dark:text-gray-100">{formatCurrency(sale.total)}</td>
@@ -377,6 +473,23 @@ const CustomersPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteCustomerModal} 
+        onClose={() => {
+          if (!isSubmitting) { 
+            setShowDeleteCustomerModal(false); 
+            setCustomerIdToDelete(null);
+          }
+        }}
+        onConfirm={confirmDeleteCustomer}
+        title="Confirmar Exclusão de Cliente"
+        message="Tem certeza que deseja excluir este cliente? Esta ação não poderá ser desfeita."
+        confirmButtonText="Excluir Cliente"
+        confirmButtonVariant="danger"
+        icon={Trash2}
+        isSubmitting={isSubmitting} 
+      />
     </div>
   );
 };

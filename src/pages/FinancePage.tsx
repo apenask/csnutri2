@@ -1,24 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react'; // Adicionado useEffect
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { DollarSign, TrendingUp, TrendingDown, Plus, Filter, Trash2, Edit, ChevronLeft, ChevronRight } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Input from '../components/ui/Input'; // Input é usado nos modais e filtros
+import Input from '../components/ui/Input';
+import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
 import { useAuth } from '../context/AuthContext';
 import { useSales } from '../context/SaleContext';
 import { useExpenses } from '../context/ExpenseContext';
-import { Expense } from '../types'; // Sale é usada para currentMonthSales
+import { Expense } from '../types'; 
 
-// Tipo para os itens da tabela de transações combinadas
 type CombinedTransaction = {
   id: string;
   type: 'income' | 'expense';
-  transactionDate: string; // Renomeado de 'date' para evitar conflito de nome em objetos mapeados
+  transactionDate: string; 
   descriptionDisplay: string;
   amountDisplay: number;
-  categoryDisplay: string; // Usado para mostrar categoria da despesa ou método de pagamento da venda
+  categoryDisplay: string; 
 };
 
 const FinancePage: React.FC = () => {
@@ -45,11 +45,26 @@ const FinancePage: React.FC = () => {
     date: format(new Date(), 'yyyy-MM-dd'),
     supplierId: undefined,
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [formError, setFormError] = useState(''); // Erro para o formulário do modal
+  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); // Mensagem para a página
+
+  // Estado para o modal de confirmação de exclusão de despesa
+  const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false);
+  const [expenseIdToDelete, setExpenseIdToDelete] = useState<string | null>(null);
+
+
+  // Efeito para limpar a mensagem da página após alguns segundos
+  useEffect(() => {
+    if (pageMessage) {
+      const timer = setTimeout(() => setPageMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageMessage]);
 
   const formatDateRangeDisplay = (date: Date) => {
-    return format(date, 'MMMM yyyy', { locale: ptBR });
+    return format(date, 'MMMM yyyy', { locale: ptBR }); // Corrigido para 'MMMM yyyy'
   };
 
   const changeMonth = (direction: 'prev' | 'next') => {
@@ -94,14 +109,16 @@ const FinancePage: React.FC = () => {
   };
   
   const handleOpenAddModal = () => {
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     setCurrentExpense(null);
     setFormData({ description: '', amount: 0, category: '', date: format(new Date(), 'yyyy-MM-dd'), supplierId: undefined });
     setShowAddExpenseModal(true);
   }
 
   const handleOpenEditModal = (expense: Expense) => {
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     setCurrentExpense(expense);
     setFormData({
         description: expense.description,
@@ -115,47 +132,60 @@ const FinancePage: React.FC = () => {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     if (!formData.description || formData.amount <= 0 || !formData.category || !formData.date) {
-      setError("Todos os campos (Descrição, Valor > 0, Categoria, Data) são obrigatórios.");
-      setIsSubmitting(false); // Mantém o modal aberto para corrigir
-      return;
+      setFormError("Todos os campos (Descrição, Valor > 0, Categoria, Data) são obrigatórios.");
+      return; // Mantém o modal aberto para corrigir
     }
     setIsSubmitting(true);
     try {
       const expensePayload = {
         ...formData,
-        date: format(parseISO(formData.date), 'yyyy-MM-dd'),
+        date: format(parseISO(formData.date), 'yyyy-MM-dd'), // Garante formato correto
       };
 
       if (showEditExpenseModal && currentExpense) {
         await updateExpense(currentExpense.id, expensePayload);
         setShowEditExpenseModal(false);
+        setPageMessage({ type: 'success', text: 'Despesa atualizada com sucesso!' });
       } else {
         await addExpense(expensePayload);
         setShowAddExpenseModal(false);
+        setPageMessage({ type: 'success', text: 'Despesa adicionada com sucesso!' });
       }
       setFormData({ description: '', amount: 0, category: '', date: format(new Date(), 'yyyy-MM-dd'), supplierId: undefined });
       setCurrentExpense(null);
     } catch (err) {
       console.error("Erro ao salvar despesa:", err);
-      setError(err instanceof Error ? err.message : 'Erro desconhecido ao salvar despesa.');
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao salvar despesa.';
+      setFormError(errorMessage);
+      setPageMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteExpense = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir esta despesa?')) {
-        setIsSubmitting(true);
-        try {
-            await deleteExpense(id);
-        } catch (err) {
-            console.error("Erro ao deletar despesa:", err);
-            setError(err instanceof Error ? err.message : 'Erro ao deletar despesa.');
-        } finally {
-            setIsSubmitting(false);
-        }
+  const requestDeleteExpense = (id: string) => {
+    setPageMessage(null);
+    setExpenseIdToDelete(id);
+    setShowDeleteExpenseConfirmModal(true);
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseIdToDelete) return;
+    setIsSubmitting(true);
+    setPageMessage(null);
+    try {
+        await deleteExpense(expenseIdToDelete);
+        setPageMessage({ type: 'success', text: 'Despesa excluída com sucesso!' });
+    } catch (err) {
+        console.error("Erro ao deletar despesa:", err);
+        setPageMessage({ type: 'error', text: err instanceof Error ? err.message : 'Erro ao deletar despesa.' });
+    } finally {
+        setIsSubmitting(false);
+        setShowDeleteExpenseConfirmModal(false);
+        setExpenseIdToDelete(null);
     }
   }
   
@@ -163,15 +193,16 @@ const FinancePage: React.FC = () => {
   const formatDateDisplay = (dateString: string | undefined) => {
     try {
         if(!dateString) return 'N/A';
-        return format(parseISO(dateString), 'dd/MM/yyyy');
+        return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR });
     } catch(e) {
+        console.warn("Erro ao formatar data em formatDateDisplay (FinancePage):", dateString, e);
         return dateString; 
     }
   }
 
   if (!isAdmin) { 
     return (
-      <div className="flex justify-center items-center h-full">
+      <div className="flex justify-center items-center h-full bg-gray-100 dark:bg-gray-900">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Acesso Restrito</h1>
           <p className="text-gray-500 dark:text-gray-400">Você não tem permissão para acessar esta página.</p>
@@ -181,7 +212,7 @@ const FinancePage: React.FC = () => {
   }
   if (isLoadingSales || isLoadingExpenses) { 
     return (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
             <p className="ml-4 text-gray-700 dark:text-gray-300">Carregando dados financeiros...</p>
         </div>
@@ -196,7 +227,7 @@ const FinancePage: React.FC = () => {
           transactionDate: s.date, 
           descriptionDisplay: `Venda #${s.id.slice(-5)}`,
           amountDisplay: s.total,
-          categoryDisplay: s.paymentMethod 
+          categoryDisplay: s.payments.map(p => p.method).join(', ') 
         })),
       ...currentMonthExpenses.map(e => ({ 
           id: `expense-${e.id}`, 
@@ -213,12 +244,18 @@ const FinancePage: React.FC = () => {
     <div className="p-4 md:p-6 text-gray-800 dark:text-gray-200">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">Financeiro</h1>
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 mt-3 md:mt-0">
           <Button variant="outline" onClick={handleOpenAddModal} disabled={isSubmitting}>
             <Plus size={16} className="mr-2" /> Nova Despesa
           </Button>
         </div>
       </div>
+
+      {pageMessage && (
+        <div className={`mb-4 p-3 rounded-md text-sm transition-opacity duration-300 ${pageMessage.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+          {pageMessage.text}
+        </div>
+      )}
       
       <Card className="mb-6" transparentDarkBg={true}>
         <div className="flex justify-between items-center p-3 sm:p-4">
@@ -325,7 +362,7 @@ const FinancePage: React.FC = () => {
       
       <Card 
         title="Detalhamento de Despesas do Mês" 
-        headerAction={ <Button variant="outline" size="sm" onClick={() => alert('Funcionalidade de filtro a ser implementada.')} disabled={isSubmitting}> <Filter size={16} className="mr-1" /> Filtrar </Button> }
+        headerAction={ <Button variant="outline" size="sm" onClick={() => setPageMessage({type: 'error', text:'Funcionalidade de filtro a ser implementada.'})} disabled={isSubmitting}> <Filter size={16} className="mr-1" /> Filtrar </Button> }
         noPadding 
       >
         <div className="overflow-x-auto">
@@ -349,7 +386,7 @@ const FinancePage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-red-600 dark:text-red-400">{formatCurrency(expense.amount)}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(expense)} className="mr-2" disabled={isSubmitting}><Edit size={14}/></Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDeleteExpense(expense.id)} disabled={isSubmitting}><Trash2 size={14}/></Button>
+                        <Button variant="danger" size="sm" onClick={() => requestDeleteExpense(expense.id)} disabled={isSubmitting}><Trash2 size={14}/></Button>
                     </td>
                   </tr>
                 ))
@@ -371,14 +408,14 @@ const FinancePage: React.FC = () => {
       {(showAddExpenseModal || showEditExpenseModal) && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-black dark:bg-opacity-75" onClick={() => {if(!isSubmitting) {setShowAddExpenseModal(false); setShowEditExpenseModal(false); setError('');}}}></div>
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-black dark:bg-opacity-75" onClick={() => {if(!isSubmitting) {setShowAddExpenseModal(false); setShowEditExpenseModal(false); setFormError('');}}}></div>
             <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
             <form onSubmit={handleFormSubmit} className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
                 <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4">
                     {showEditExpenseModal ? 'Editar Despesa' : 'Nova Despesa'}
                   </h3>
-                  {error && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{error}</p>}
+                  {formError && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{formError}</p>}
                   <div className="space-y-4">
                     <Input label="Descrição" type="text" name="description" required value={formData.description} onChange={handleInputChange} fullWidth/>
                     <Input label="Valor (R$)" type="number" name="amount" min="0.01" step="0.01" required value={String(formData.amount)} onChange={handleInputChange} fullWidth/>
@@ -401,11 +438,11 @@ const FinancePage: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
                   <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
                     {showEditExpenseModal ? 'Salvar Alterações' : 'Adicionar Despesa'}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => {if(!isSubmitting) {setShowAddExpenseModal(false); setShowEditExpenseModal(false); setError('');}}} disabled={isSubmitting} className="mt-3 sm:mt-0 sm:ml-3">
+                  <Button type="button" variant="outline" onClick={() => {if(!isSubmitting) {setShowAddExpenseModal(false); setShowEditExpenseModal(false); setFormError('');}}} disabled={isSubmitting} className="mt-3 sm:mt-0 sm:ml-3">
                     Cancelar
                   </Button>
                 </div>
@@ -413,6 +450,23 @@ const FinancePage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteExpenseConfirmModal}
+        onClose={() => {
+            if(!isSubmitting) {
+                setShowDeleteExpenseConfirmModal(false);
+                setExpenseIdToDelete(null);
+            }
+        }}
+        onConfirm={confirmDeleteExpense}
+        title="Confirmar Exclusão de Despesa"
+        message="Tem certeza que deseja excluir esta despesa? Esta ação não poderá ser desfeita."
+        confirmButtonText="Excluir Despesa"
+        confirmButtonVariant="danger"
+        icon={Trash2}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 };

@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react'; // Adicionado useEffect
 import { Plus, Search, Edit, Trash2, Truck } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
 import { Supplier } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useSuppliers } from '../context/SupplierContext'; 
@@ -26,8 +27,22 @@ const SuppliersPage: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Omit<Supplier, 'id'>>>({
     name: '', phone: '', email: '', address: ''
   });
+  
+  const [formError, setFormError] = useState<string | null>(null); // Erro para o formulário do modal
+  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); // Mensagem para a página
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
+
+  // Estado para o modal de confirmação de exclusão
+  const [showDeleteSupplierModal, setShowDeleteSupplierModal] = useState(false);
+  const [supplierIdToDelete, setSupplierIdToDelete] = useState<string | null>(null);
+
+  // Efeito para limpar a mensagem da página após alguns segundos
+  useEffect(() => {
+    if (pageMessage) {
+      const timer = setTimeout(() => setPageMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageMessage]);
 
   const filteredSuppliers = useMemo(() => {
     if (isLoadingSuppliers) return [];
@@ -47,6 +62,7 @@ const SuppliersPage: React.FC = () => {
     setCurrentSupplier(null);
     setFormData({ name: '', phone: '', email: '', address: '' });
     setFormError(null);
+    setPageMessage(null);
     setShowAddModal(true);
   };
 
@@ -55,30 +71,44 @@ const SuppliersPage: React.FC = () => {
     setFormData({
       name: supplier.name,
       phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address || ''
+      email: supplier.email || '', // Garantir que seja string
+      address: supplier.address || '' // Garantir que seja string
     });
     setFormError(null);
+    setPageMessage(null);
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este fornecedor?')) {
-      setIsSubmitting(true);
-      try {
-        await deleteSupplier(id);
-      } catch (error) {
-        console.error("Erro ao excluir fornecedor:", error);
-        setFormError(error instanceof Error ? error.message : "Erro ao excluir fornecedor.");
-      } finally {
-        setIsSubmitting(false);
-      }
+  // Abre o modal de confirmação para exclusão
+  const requestDeleteSupplier = (id: string) => {
+    setPageMessage(null);
+    setSupplierIdToDelete(id);
+    setShowDeleteSupplierModal(true);
+  };
+
+  // Função chamada pelo modal de confirmação
+  const confirmDeleteSupplier = async () => {
+    if (!supplierIdToDelete) return;
+    setIsSubmitting(true); // Usar isSubmitting para o modal de deleção também
+    setPageMessage(null);
+    try {
+      await deleteSupplier(supplierIdToDelete);
+      setPageMessage({ type: 'success', text: 'Fornecedor excluído com sucesso!' });
+    } catch (error) {
+      console.error("Erro ao excluir fornecedor:", error);
+      setPageMessage({ type: 'error', text: error instanceof Error ? error.message : "Erro ao excluir fornecedor." });
+    } finally {
+      setIsSubmitting(false);
+      setShowDeleteSupplierModal(false);
+      setSupplierIdToDelete(null);
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    setPageMessage(null);
+
     if (!formData.name || !formData.phone) {
       setFormError("Nome e Telefone são obrigatórios.");
       return;
@@ -91,20 +121,26 @@ const SuppliersPage: React.FC = () => {
         phone: formData.phone!,
         email: formData.email || '',
         address: formData.address || '',
+        // Adicionar contactName se fizer parte do formulário/tipo
+        // contactName: formData.contactName || '', 
       };
 
       if (showEditModal && currentSupplier) {
         await updateSupplier(currentSupplier.id, payload);
         setShowEditModal(false);
+        setPageMessage({ type: 'success', text: 'Fornecedor atualizado com sucesso!' });
       } else {
         await addSupplier(payload);
         setShowAddModal(false);
+        setPageMessage({ type: 'success', text: 'Fornecedor adicionado com sucesso!' });
       }
       setFormData({ name: '', phone: '', email: '', address: '' });
       setCurrentSupplier(null);
     } catch (error) {
       console.error("Erro ao salvar fornecedor:", error);
-      setFormError(error instanceof Error ? error.message : "Ocorreu um erro desconhecido.");
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido.";
+      setFormError(errorMessage);
+      setPageMessage({type: 'error', text: errorMessage});
     } finally {
       setIsSubmitting(false);
     }
@@ -139,6 +175,12 @@ const SuppliersPage: React.FC = () => {
           Novo Fornecedor
         </Button>
       </div>
+
+      {pageMessage && (
+        <div className={`mb-4 p-3 rounded-md text-sm transition-opacity duration-300 ${pageMessage.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+          {pageMessage.text}
+        </div>
+      )}
       
       <Card className="mb-6" transparentDarkBg={true}>
         <div className="p-3 md:p-4">
@@ -185,7 +227,7 @@ const SuppliersPage: React.FC = () => {
                     <td className="px-6 py-4 whitespace-normal text-sm text-gray-600 dark:text-gray-300 hidden md:table-cell">{supplier.address}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-1">
                       <Button variant="outline" size="sm" onClick={() => handleEdit(supplier)} className="px-2 py-1" disabled={isSubmitting}><Edit size={16} /></Button>
-                      <Button variant="danger" size="sm" onClick={() => handleDelete(supplier.id)} className="px-2 py-1" disabled={isSubmitting}><Trash2 size={16} /></Button>
+                      <Button variant="danger" size="sm" onClick={() => requestDeleteSupplier(supplier.id)} className="px-2 py-1" disabled={isSubmitting}><Trash2 size={16} /></Button>
                     </td>
                   </tr>
                 ))
@@ -239,6 +281,23 @@ const SuppliersPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteSupplierModal}
+        onClose={() => {
+          if (!isSubmitting) { // Só permite fechar se não estiver submetendo
+            setShowDeleteSupplierModal(false);
+            setSupplierIdToDelete(null);
+          }
+        }}
+        onConfirm={confirmDeleteSupplier}
+        title="Confirmar Exclusão de Fornecedor"
+        message="Tem certeza que deseja excluir este fornecedor? Esta ação não poderá ser desfeita."
+        confirmButtonText="Excluir Fornecedor"
+        confirmButtonVariant="danger"
+        icon={Trash2}
+        isSubmitting={isSubmitting} // Passa o estado de submissão para o modal
+      />
     </div>
   );
 };

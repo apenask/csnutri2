@@ -49,7 +49,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       {/* Card do Modal */}
       <Card className="relative z-10 w-full max-w-md shadow-xl !p-0 overflow-hidden">
         {/* Conteúdo do Modal */}
-        <div className="px-6 py-5 text-center"> {/* Conteúdo principal centralizado */}
+        <div className="px-6 py-5 text-center"> 
             {IconComponent && (
                 <div className={`mx-auto mb-4 flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${
                     confirmButtonVariant === 'danger' ? 'bg-red-100 dark:bg-red-500/20' : 'bg-blue-100 dark:bg-blue-500/20'
@@ -73,13 +73,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             </div>
         </div>
         {/* Rodapé com Botões */}
-        {/* Alterado para sm:justify-center e removido sm:flex-row-reverse para centralizar os botões */}
-        <div className="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 sm:flex sm:justify-center gap-3"> {/* Ajustado gap para sm:gap-3 ou similar */}
-          {/* Ordem dos botões invertida para Cancelar ficar à esquerda e Confirmar à direita */}
+        {/* Alterado para sm:justify-between para alinhar os botões às extremidades */}
+        <div className="px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:justify-between gap-3"> 
+          {/* Botões com largura automática em telas sm e maiores, e ordem mantida */}
           <Button
             variant="outline"
             onClick={handleClose}
-            className="w-full sm:w-auto mt-2 sm:mt-0 sm:order-1" // sm:order-1 para o botão de cancelar
+            className="w-full sm:w-auto mt-2 sm:mt-0" // sm:order-1 removido, a ordem no HTML já define
             disabled={isSubmitting}
           >
             {cancelButtonText}
@@ -87,7 +87,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           <Button
             variant={confirmButtonVariant}
             onClick={handleConfirm}
-            className="w-full sm:w-auto sm:order-2" // sm:order-2 para o botão de confirmar
+            className="w-full sm:w-auto" // sm:order-2 removido
             isLoading={isSubmitting}
             disabled={isSubmitting}
           >

@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react'; // Removido useEffect pois não está sendo usado
+import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
 import { Product } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useProducts } from '../context/ProductContext';
@@ -26,8 +27,22 @@ const ProductsPage: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0, imageUrl: '', customCategory: '',
   });
-  const [error, setError] = useState<string>('');
+  
+  const [formError, setFormError] = useState<string>(''); // Erro para o formulário do modal
+  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); // Mensagem para a página
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Estado para o modal de confirmação de exclusão
+  const [showDeleteProductModal, setShowDeleteProductModal] = useState(false);
+  const [productIdToDelete, setProductIdToDelete] = useState<string | null>(null);
+
+  // Efeito para limpar a mensagem da página após alguns segundos
+  useEffect(() => {
+    if (pageMessage) {
+      const timer = setTimeout(() => setPageMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageMessage]);
 
   const filteredProducts = useMemo(() => {
     if (isLoadingProducts) return [];
@@ -48,15 +63,16 @@ const ProductsPage: React.FC = () => {
   };
 
   const handleOpenAddModal = () => {
-    console.log('Botão Novo Produto clicado - handleOpenAddModal chamada');
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     setCurrentProduct(null);
     setFormData({ name: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0, imageUrl: '', customCategory: '' });
-    setShowAddModal(true); // ESTA LINHA DEVE ABRIR O MODAL
+    setShowAddModal(true);
   };
 
   const handleEdit = (product: Product) => {
-    setError('');
+    setFormError('');
+    setPageMessage(null);
     setCurrentProduct(product);
     setFormData({
         name: product.name || '',
@@ -71,66 +87,84 @@ const ProductsPage: React.FC = () => {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este produto?')) {
-      setIsSubmitting(true);
-      try {
-        await deleteProduct(id);
-      } catch (err) {
-        console.error("Erro ao deletar produto:", err);
-        setError(err instanceof Error ? err.message : 'Erro ao deletar produto');
-      } finally {
-        setIsSubmitting(false);
-      }
+  // Abre o modal de confirmação para exclusão
+  const requestDeleteProduct = (id: string) => {
+    setPageMessage(null);
+    setProductIdToDelete(id);
+    setShowDeleteProductModal(true);
+  };
+
+  // Função chamada pelo modal de confirmação
+  const confirmDeleteProduct = async () => {
+    if (!productIdToDelete) return;
+    setIsSubmitting(true); // Usar isSubmitting para o modal de deleção também
+    setPageMessage(null);
+    try {
+      await deleteProduct(productIdToDelete);
+      setPageMessage({ type: 'success', text: 'Produto excluído com sucesso!' });
+    } catch (err) {
+      console.error("Erro ao deletar produto:", err);
+      setPageMessage({ type: 'error', text: err instanceof Error ? err.message : 'Erro ao deletar produto' });
+    } finally {
+      setIsSubmitting(false);
+      setShowDeleteProductModal(false);
+      setProductIdToDelete(null);
     }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    if (!formData.name || !(formData.customCategory || formData.category)) { // Verifica se uma das categorias está preenchida
-      setError('Nome e Categoria (Padrão ou Customizada) são obrigatórios.');
-      setIsSubmitting(false);
+    setFormError('');
+    setPageMessage(null);
+    
+    if (!formData.name || !(formData.customCategory || formData.category)) {
+      setFormError('Nome e Categoria (Padrão ou Customizada) são obrigatórios.');
       return;
     }
     if (formData.price == null || formData.cost == null || formData.stock == null || formData.minStock == null) {
-        setError('Preço, Custo, Estoque e Estoque Mínimo são obrigatórios e devem ser números.');
-        setIsSubmitting(false);
+        setFormError('Preço, Custo, Estoque e Estoque Mínimo são obrigatórios e devem ser números.');
         return;
     }
+    if (Number(formData.price) < 0 || Number(formData.cost) < 0 || Number(formData.stock) < 0 || Number(formData.minStock) < 0) {
+        setFormError('Valores numéricos não podem ser negativos.');
+        return;
+    }
+    setIsSubmitting(true);
     
     try {
       const productPayload: Omit<Product, 'id'> = {
           name: formData.name!,
-          category: formData.category || 'Outros', // Fallback se customCategory não for usado e category estiver vazia
+          category: formData.category || 'Outros',
           price: Number(formData.price) || 0,
           cost: Number(formData.cost) || 0,
           stock: Number(formData.stock) || 0,
           minStock: Number(formData.minStock) || 0,
           imageUrl: formData.imageUrl,
           customCategory: formData.customCategory,
+          supplierId: formData.supplierId, // Adicionado se existir no formData
+          barcode: formData.barcode, // Adicionado se existir no formData
       };
-      // Se customCategory for preenchida, ela tem precedência.
+      
       if (formData.customCategory && formData.customCategory.trim() !== '') {
-        productPayload.category = formData.customCategory; // Usar customCategory como a categoria principal se preenchida
-        productPayload.customCategory = formData.customCategory; // E manter em customCategory também
+        productPayload.category = formData.customCategory;
       }
-
 
       if (showEditModal && currentProduct) {
         await updateProduct(currentProduct.id, productPayload);
         setShowEditModal(false);
+        setPageMessage({ type: 'success', text: 'Produto atualizado com sucesso!' });
       } else {
         await addProduct(productPayload);
         setShowAddModal(false);
+        setPageMessage({ type: 'success', text: 'Produto adicionado com sucesso!' });
       }
       setFormData({ name: '', category: '', price: 0, cost: 0, stock: 0, minStock: 0, imageUrl: '', customCategory: '' });
       setCurrentProduct(null);
     } catch (err) {
       console.error("Erro ao salvar produto:", err);
-      setError(err instanceof Error ? err.message : 'Erro ao salvar produto');
+      const errorMessage = err instanceof Error ? err.message : 'Erro desconhecido ao salvar produto';
+      setFormError(errorMessage); // Erro no modal
+      setPageMessage({ type: 'error', text: errorMessage }); // Erro na página
     } finally {
       setIsSubmitting(false);
     }
@@ -158,6 +192,12 @@ const ProductsPage: React.FC = () => {
           </Button>
         )}
       </div>
+
+      {pageMessage && (
+        <div className={`mb-4 p-3 rounded-md text-sm transition-opacity duration-300 ${pageMessage.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+          {pageMessage.text}
+        </div>
+      )}
       
       <Card className="mb-6" transparentDarkBg={true}>
         <div className="p-3 md:p-4">
@@ -236,7 +276,7 @@ const ProductsPage: React.FC = () => {
                     {isAdmin && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(product)} className="mr-2" disabled={isSubmitting}><Edit size={16} /></Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDelete(product.id)} disabled={isSubmitting}><Trash2 size={16} /></Button>
+                        <Button variant="danger" size="sm" onClick={() => requestDeleteProduct(product.id)} disabled={isSubmitting}><Trash2 size={16} /></Button>
                       </td>
                     )}
                   </tr>
@@ -257,14 +297,14 @@ const ProductsPage: React.FC = () => {
       {(showAddModal || showEditModal) && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-black dark:bg-opacity-75 transition-opacity" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setError('');}}}></div>
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 dark:bg-black dark:bg-opacity-75 transition-opacity" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setFormError('');}}}></div>
             <span className="hidden sm:inline-block sm:h-screen sm:align-middle">&#8203;</span>
             <form onSubmit={handleSave} className="inline-block transform overflow-hidden rounded-lg bg-white dark:bg-gray-800 text-left align-bottom shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:align-middle">
               <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 mb-4">
                   {showEditModal ? 'Editar Produto' : 'Novo Produto'}
                 </h3>
-                {error && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{error}</p>}
+                {formError && <p className="text-red-600 dark:text-red-400 text-sm mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-md">{formError}</p>}
                 <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-6">
                   <div className="sm:col-span-6"><Input label="Nome do Produto" type="text" name="name" id="name" required value={formData.name || ''} onChange={handleInputChange}/></div>
                   <div className="sm:col-span-3">
@@ -275,6 +315,7 @@ const ProductsPage: React.FC = () => {
                       <option value="Snacks">Lanches</option>
                       <option value="Accessories">Acessórios</option>
                       <option value="Clothing">Vestuário</option>
+                      <option value="Outros">Outros</option>
                     </select>
                   </div>
                   <div className="sm:col-span-3"><Input label="Ou Categoria Customizada" type="text" name="customCategory" id="customCategory" value={formData.customCategory || ''} onChange={handleInputChange} /></div>
@@ -289,7 +330,7 @@ const ProductsPage: React.FC = () => {
                 <Button type="submit" isLoading={isSubmitting} disabled={isSubmitting}>
                   {showEditModal ? 'Salvar Alterações' : 'Adicionar Produto'}
                 </Button>
-                <Button type="button" variant="outline" className="mt-3 sm:mt-0 sm:ml-3" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setError('');}}} disabled={isSubmitting}>
+                <Button type="button" variant="outline" className="mt-3 sm:mt-0 sm:ml-3" onClick={() => {if(!isSubmitting){setShowAddModal(false); setShowEditModal(false); setFormError('');}}} disabled={isSubmitting}>
                   Cancelar
                 </Button>
               </div>
@@ -297,6 +338,23 @@ const ProductsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={showDeleteProductModal}
+        onClose={() => {
+          if (!isSubmitting) {
+            setShowDeleteProductModal(false);
+            setProductIdToDelete(null);
+          }
+        }}
+        onConfirm={confirmDeleteProduct}
+        title="Confirmar Exclusão de Produto"
+        message="Tem certeza que deseja excluir este produto? Esta ação não poderá ser desfeita."
+        confirmButtonText="Excluir Produto"
+        confirmButtonVariant="danger"
+        icon={Trash2}
+        isSubmitting={isSubmitting}
+      />
     </div>
   );
 };
