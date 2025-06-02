@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { format, parseISO, subDays } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns'; // Removido startOfMonth, endOfMonth
+import { ptBR } from 'date-fns/locale'; 
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  LineChart, Line
+  LineChart, Line, PieChart, Pie, Cell, Legend
 } from 'recharts';
-// CORREÇÃO: Ícones importados conforme o uso no JSX completo
 import { Download, BarChart2, Users, PackageSearch, PieChart as PieChartIcon, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react'; 
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -14,9 +14,9 @@ import { useProducts } from '../context/ProductContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { useAuth } from '../context/AuthContext';
-import { Customer, Sale, Expense, Product as ProductType } from '../types';
+import { Customer, Sale, Expense, Product as ProductType } from '../types'; // Removido PaymentDetail
 
-import jsPDF from 'jspdf'; // Usado em generatePDFReport
+import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
 type CustomerReportRow = Customer & {
@@ -26,7 +26,7 @@ type CustomerReportRow = Customer & {
 
 type DetailedReportTransaction = {
   id: string;
-  date: string;
+  date: string; // Mantido como 'date' para consistência com os objetos originais
   description: string;
   category: string;
   type: 'income' | 'expense';
@@ -52,12 +52,11 @@ const ReportsPage: React.FC = () => {
 
   const formatDateDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
-    try { return format(parseISO(dateString), 'dd/MM/yyyy'); } 
+    try { return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR }); } 
     catch (e) { console.warn(`Erro ao formatar data no formatDateDisplay: ${dateString}`, e); return dateString; }
   };
-
-  // formatDateTimeForPDF não estava sendo usada, então foi removida para limpar o aviso.
-  // Se precisar dela no futuro, pode readicionar.
+  
+  // formatDateTimeForPDF removida pois não estava sendo usada.
 
   const formatCurrency = (value: number | undefined): string => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -68,7 +67,7 @@ const ReportsPage: React.FC = () => {
     try {
         const start = parseISO(dateRange.start);
         const end = parseISO(dateRange.end);
-        end.setHours(23, 59, 59, 999);
+        end.setHours(23, 59, 59, 999); // Garante que o dia final seja incluído completamente
         return sales.filter(sale => {
           try { const saleDate = parseISO(sale.date); return saleDate >= start && saleDate <= end; } 
           catch { return false; }
@@ -81,7 +80,7 @@ const ReportsPage: React.FC = () => {
     try {
         const start = parseISO(dateRange.start);
         const end = parseISO(dateRange.end);
-        end.setHours(23, 59, 59, 999);
+        end.setHours(23, 59, 59, 999); // Garante que o dia final seja incluído completamente
         return expenses.filter(expense => {
           try { const expenseDate = parseISO(expense.date); return expenseDate >= start && expenseDate <= end; } 
           catch { return false; }
@@ -92,7 +91,7 @@ const ReportsPage: React.FC = () => {
   const salesChartData = useMemo(() => { 
     if (!filteredSales.length) return [];
     const salesByDay = filteredSales.reduce<Record<string, number>>((acc, sale) => {
-      const day = sale.date; 
+      const day = sale.date; // A data já está no formato 'yyyy-MM-dd'
       acc[day] = (acc[day] || 0) + sale.total;
       return acc;
     }, {});
@@ -140,13 +139,14 @@ const ReportsPage: React.FC = () => {
     return [
       ...filteredSales.map((sale: Sale) => ({
         id: `sale-${sale.id}`, date: sale.date, description: `Venda #${sale.id.slice(-5)}`,
-        category: 'Venda (Receita)', type: 'income' as const, amount: sale.total 
+        category: sale.payments.length > 0 ? sale.payments.map(p=>p.method).join(', ') : 'N/A', 
+        type: 'income' as const, amount: sale.total 
       })),
       ...filteredExpenses.map((expense: Expense) => ({
         id: `expense-${expense.id}`, date: expense.date, description: expense.description,
         category: expense.category, type: 'expense' as const, amount: expense.amount 
       }))
-    ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+    ].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // CORRIGIDO: usar a.date e b.date
   }, [filteredSales, filteredExpenses]);
   
   const totalIncome = useMemo(() => filteredSales.reduce((sum, sale: Sale) => sum + sale.total, 0), [filteredSales]);
@@ -160,13 +160,77 @@ const ReportsPage: React.FC = () => {
     doc.text(reportTitleText, 105, 20, { align: 'center' }); 
     doc.setFontSize(10); 
     doc.text(`Período: ${formatDateDisplay(dateRange.start)} a ${formatDateDisplay(dateRange.end)}`, 105, 28, { align: 'center' });
-    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 105, 34, { align: 'center' });
-    if (reportType === 'sales') { /* ... (Conteúdo PDF Vendas como antes) ... */ } 
-    else if (reportType === 'inventory') { /* ... (Conteúdo PDF Estoque como antes) ... */ } 
-    else if (reportType === 'customers') { /* ... (Conteúdo PDF Clientes como antes) ... */ } 
-    else if (reportType === 'finance') { /* ... (Conteúdo PDF Financeiro como antes) ... */ }
+    doc.text(`Gerado em: ${format(new Date(), 'dd/MM/yyyy HH:mm', {locale: ptBR})}`, 105, 34, { align: 'center' });
+
+    if (reportType === 'sales') {
+        // @ts-ignore
+      doc.autoTable({
+        startY: 45,
+        head: [['Data', 'Cliente', 'Itens', 'Pagamento', 'Total']],
+        body: filteredSales.map(sale => [
+          formatDateDisplay(sale.date),
+          getCustomerById(sale.customerId || '')?.name || 'N/A',
+          sale.items.length,
+          sale.payments.map(p => p.method.charAt(0).toUpperCase() + p.method.slice(1)).join(', '), 
+          formatCurrency(sale.total)
+        ]),
+        foot: [['', '', '', 'Total Geral', formatCurrency(totalIncome)]]
+      });
+    } else if (reportType === 'inventory') {
+        // @ts-ignore
+      doc.autoTable({
+        startY: 45,
+        head: [['Produto', 'Categoria', 'Estoque', 'Mínimo', 'Custo', 'Preço', 'Valor Total (Custo)']],
+        body: products.map(product => [
+          product.name,
+          product.customCategory || product.category,
+          product.stock,
+          product.minStock,
+          formatCurrency(product.cost),
+          formatCurrency(product.price),
+          formatCurrency(product.stock * product.cost)
+        ]),
+        foot: [['', '', '', '', '', 'Total em Estoque', formatCurrency(
+          products.reduce((sum, product) => sum + (product.stock * product.cost), 0)
+        )]],
+      });
+    } else if (reportType === 'customers') {
+        // @ts-ignore
+      doc.autoTable({
+        startY: 45,
+        head: [['Cliente', 'Telefone', 'Email', 'Compras', 'Total Gasto', 'Ticket Médio']],
+        body: customerReportTableData.map(customer => [
+          customer.name,
+          customer.phone,
+          customer.email,
+          customer.salesCount,
+          formatCurrency(customer.totalSpent),
+          formatCurrency(customer.averagePerSale)
+        ]),
+      });
+    } else if (reportType === 'finance') {
+      doc.setFontSize(12);
+      doc.text('Resumo Financeiro', 14, 45);
+      doc.setFontSize(10);
+      doc.text(`Receitas: ${formatCurrency(totalIncome)}`, 14, 55);
+      doc.text(`Despesas: ${formatCurrency(totalExpensesValue)}`, 14, 62);
+      doc.text(`Saldo: ${formatCurrency(balance)}`, 14, 69);
+        // @ts-ignore
+      doc.autoTable({
+        startY: 80,
+        head: [['Data', 'Descrição', 'Categoria', 'Tipo', 'Valor']],
+        body: detailedFinancialTransactions.map(transaction => [
+          formatDateDisplay(transaction.date),
+          transaction.description,
+          transaction.category,
+          transaction.type === 'income' ? 'Receita' : 'Despesa',
+          formatCurrency(transaction.amount)
+        ]),
+      });
+    }
     doc.save(`relatorio_${reportType}_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
   };
+
 
   if (!isAdmin) { return ( <div className="flex justify-center items-center h-full bg-gray-100 dark:bg-gray-900"><div className="text-center"><h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Acesso Restrito</h1><p className="text-gray-500 dark:text-gray-400">Você não tem permissão.</p></div></div> ); }
   if (isLoading) { return ( <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div><p className="ml-4 text-gray-700 dark:text-gray-300">Carregando relatórios...</p></div> ); }
@@ -178,7 +242,8 @@ const ReportsPage: React.FC = () => {
     { key: 'finance' as const, label: 'Financeiro', icon: PieChartIcon },
   ];
 
-  // JSX COMPLETO E CORRIGIDO PARA A PÁGINA DE RELATÓRIOS
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#E41E26', '#A259FF', '#FF5733'];
+
   return (
     <div className="p-4 md:p-6 text-gray-800 dark:text-gray-200">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-3">
@@ -224,7 +289,6 @@ const ReportsPage: React.FC = () => {
       </Card>
       
       <div className="space-y-6">
-        {/* Relatório de Vendas */}
         {reportType === 'sales' && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -244,7 +308,7 @@ const ReportsPage: React.FC = () => {
             </Card>
             <Card title="Detalhamento de Vendas" noPadding>
               <div className="overflow-x-auto">
-                <table className="min-w-full"><thead className="bg-gray-100 dark:bg-gray-700/60"><tr><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Data</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Cliente</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">Itens</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Pagamento</th><th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Total</th></tr></thead><tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">{filteredSales.length > 0 ? (filteredSales.map((sale: Sale) => { const customer = getCustomerById(sale.customerId || ''); return (<tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40"><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDateDisplay(sale.date)}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer ? customer.name : 'Cliente não informado'}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}</td><td className="px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell"><span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${ sale.paymentMethod === 'pix' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-700/30 dark:text-cyan-300' : sale.paymentMethod === 'credit' ? 'bg-blue-100 text-blue-800 dark:bg-blue-700/30 dark:text-blue-300' :  sale.paymentMethod === 'debit' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-700/30 dark:text-indigo-300' :'bg-green-100 text-green-800 dark:bg-green-700/30 dark:text-green-300' }`}>{sale.paymentMethod.charAt(0).toUpperCase() + sale.paymentMethod.slice(1)}</span></td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-800 dark:text-gray-100">{formatCurrency(sale.total)}</td></tr> );}) ) : ( <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">Nenhuma venda no período.</td></tr> )}</tbody>{filteredSales.length > 0 && ( <tfoot><tr className="bg-gray-100 dark:bg-gray-700/60"><td colSpan={4} className="px-6 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase">Total</td><td className="px-6 py-3 text-right text-sm font-bold text-gray-800 dark:text-gray-100">{formatCurrency(totalIncome)}</td></tr></tfoot> )}</table>
+                <table className="min-w-full"><thead className="bg-gray-100 dark:bg-gray-700/60"><tr><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Data</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Cliente</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden md:table-cell">Itens</th><th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider hidden sm:table-cell">Pagamento</th><th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Total</th></tr></thead><tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">{filteredSales.length > 0 ? (filteredSales.map((sale: Sale) => { const customer = getCustomerById(sale.customerId || ''); const paymentMethodDisplay = sale.payments && sale.payments.length > 0 ? sale.payments[0].method : 'N/A'; return (<tr key={sale.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/40"><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">{formatDateDisplay(sale.date)}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">{customer ? customer.name : 'Cliente não informado'}</td><td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden md:table-cell">{sale.items.length} {sale.items.length === 1 ? 'item' : 'itens'}</td><td className="px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell"><span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${ paymentMethodDisplay === 'pix' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-700/30 dark:text-cyan-300' : paymentMethodDisplay === 'credit' ? 'bg-blue-100 text-blue-800 dark:bg-blue-700/30 dark:text-blue-300' :  paymentMethodDisplay === 'debit' ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-700/30 dark:text-indigo-300' :'bg-green-100 text-green-800 dark:bg-green-700/30 dark:text-green-300' }`}>{paymentMethodDisplay.charAt(0).toUpperCase() + paymentMethodDisplay.slice(1)}</span></td><td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-800 dark:text-gray-100">{formatCurrency(sale.total)}</td></tr> );}) ) : ( <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-500 dark:text-gray-400">Nenhuma venda no período.</td></tr> )}</tbody>{filteredSales.length > 0 && ( <tfoot><tr className="bg-gray-100 dark:bg-gray-700/60"><td colSpan={4} className="px-6 py-3 text-right text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase">Total</td><td className="px-6 py-3 text-right text-sm font-bold text-gray-800 dark:text-gray-100">{formatCurrency(totalIncome)}</td></tr></tfoot> )}</table>
               </div>
             </Card>
           </>
@@ -282,7 +346,7 @@ const ReportsPage: React.FC = () => {
             </div>
             <Card title="Despesas por Categoria" noPadding>
               <div className="h-80 p-4">
-                {expensesByCategoryChartData.length > 0 ? (<ResponsiveContainer width="100%" height="100%"><BarChart data={expensesByCategoryChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700"/><XAxis dataKey="category" tick={{fontSize: 10, fill: 'currentColor'}} className="text-gray-600 dark:text-gray-400"/><YAxis tickFormatter={(value) => formatCurrency(Number(value))} tick={{fontSize: 10, fill: 'currentColor'}} className="text-gray-600 dark:text-gray-400"/><Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(4px)', borderRadius: '0.5rem', borderColor: '#e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)' }} wrapperClassName="!text-sm dark:![&_.recharts-tooltip-item]:!text-gray-700" formatter={(value:number) => [formatCurrency(Number(value)), 'Total']} /><Bar dataKey="amount" fill="#E41E26" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer>) : (<div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Nenhuma despesa no período.</div>)}
+                {expensesByCategoryChartData.length > 0 ? (<ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={expensesByCategoryChartData} cx="50%" cy="50%" outerRadius={80} fill="#8884d8" dataKey="value" labelLine={false} label={({ name, percent, value }) => `${name}: ${formatCurrency(value)} (${(percent * 100).toFixed(0)}%)`}>{expensesByCategoryChartData.map((_entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(value: number) => formatCurrency(value)} wrapperClassName="!bg-white dark:!bg-gray-700 !border-gray-300 dark:!border-gray-600 rounded shadow-lg"/><Legend formatter={(value) => <span className="text-gray-700 dark:text-gray-300">{value}</span>} /></PieChart></ResponsiveContainer>) : (<div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">Nenhuma despesa no período.</div>)}
               </div>
             </Card>
             <Card title="Relatório Financeiro Detalhado" noPadding>

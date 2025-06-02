@@ -8,7 +8,9 @@ import { customers as initialCustomersFallback } from '../data/mockData'; // Fal
 // Define a estrutura do que será exposto pelo contexto de clientes
 interface CustomerContextType {
   customers: Customer[];
-  addCustomer: (customerData: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent' | 'customCategory'> & { address?: string; email: string; category?: string }) => Promise<Customer>;
+  // Assinatura de addCustomer ajustada: Omit remove campos gerenciados internamente.
+  // Os campos restantes de Customer (name, phone, email obrigatórios; address, cpf, customCategory opcionais) são esperados.
+  addCustomer: (customerData: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent'>) => Promise<Customer>;
   updateCustomer: (id: string, customerData: Partial<Customer>) => Promise<Customer>;
   deleteCustomer: (id: string) => Promise<void>;
   getCustomerById: (id: string) => Customer | undefined;
@@ -25,23 +27,23 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Efeito para carregar clientes do localStorage ou usar fallback
   useEffect(() => {
-    let loadedCustomers: Customer[] = initialCustomersFallback.map(c => ({
+    let loadedCustomers: Customer[] = initialCustomersFallback.map((c: Customer) => ({ // Tipo explícito para 'c'
         ...c,
         points: c.points || 0,
         totalPurchases: c.totalPurchases || 0,
-        totalSpent: c.totalSpent || 0, // GARANTIR INICIALIZAÇÃO
+        totalSpent: c.totalSpent || 0, 
         customCategory: c.customCategory || undefined, 
     }));
     try {
       const savedCustomers = localStorage.getItem('csNutriCustomers');
       if (savedCustomers) {
         const parsedCustomers = JSON.parse(savedCustomers) as Customer[];
-        loadedCustomers = parsedCustomers.map(c => ({
+        loadedCustomers = parsedCustomers.map((c: Customer) => ({ // Tipo explícito para 'c'
             ...c,
             points: c.points || 0,
             totalPurchases: c.totalPurchases || 0,
             totalSpent: c.totalSpent || 0,
-            customCategory: c.customCategory || undefined, // Garante que exista
+            customCategory: c.customCategory || undefined, 
         }));
       } else {
         localStorage.setItem('csNutriCustomers', JSON.stringify(loadedCustomers));
@@ -54,7 +56,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
     setCustomers(loadedCustomers);
     setIsLoading(false);
-  }, []); // Array de dependências vazio para executar apenas na montagem
+  }, []); 
 
   // Efeito para salvar clientes no localStorage quando a lista mudar
   useEffect(() => {
@@ -65,8 +67,9 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Função para adicionar um novo cliente
   const addCustomer = async (
-    customerData: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent' | 'customCategory'> & { address?: string; email: string; category?: string }
+    customerData: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent'>
     ): Promise<Customer> => {
+    // Validação básica, pode ser expandida
     if (!customerData.name || !customerData.phone || !customerData.email) {
       throw new Error('Nome, telefone e email são obrigatórios para o cliente.');
     }
@@ -76,11 +79,11 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
       phone: customerData.phone,
       email: customerData.email,
       address: customerData.address,
-      points: 0,
-      totalPurchases: 0,
-      totalSpent: 0, // Inicializado aqui
-      category: customerData.category,
-      customCategory: undefined,
+      cpf: customerData.cpf, // Se cpf for parte do customerData
+      customCategory: customerData.customCategory, // Se customCategory for parte do customerData
+      points: 0, // Inicializa pontos
+      totalPurchases: 0, // Inicializa totalPurchases
+      totalSpent: 0, // Inicializa totalSpent
     };
     setCustomers(prevCustomers => [...prevCustomers, newCustomer]);
     return newCustomer;
@@ -90,7 +93,7 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
   const updateCustomer = async (id: string, customerData: Partial<Customer>): Promise<Customer> => {
     let updatedCustomerInstance: Customer | null = null;
     setCustomers(prevCustomers =>
-      prevCustomers.map(c => {
+      prevCustomers.map((c: Customer) => { // Tipo explícito para 'c'
         if (c.id === id) {
           updatedCustomerInstance = { ...c, ...customerData };
           return updatedCustomerInstance;
@@ -106,12 +109,12 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   // Função para deletar um cliente
   const deleteCustomer = async (id: string): Promise<void> => {
-    setCustomers(prevCustomers => prevCustomers.filter(c => c.id !== id));
+    setCustomers(prevCustomers => prevCustomers.filter((c: Customer) => c.id !== id)); // Tipo explícito para 'c'
   };
 
   // Função para buscar um cliente por ID
   const getCustomerById = (id: string): Customer | undefined => {
-    return customers.find(c => c.id === id);
+    return customers.find((c: Customer) => c.id === id); // Tipo explícito para 'c'
   };
 
   // Retorna o Provedor do Contexto
@@ -123,7 +126,6 @@ export const CustomerProvider: React.FC<{ children: ReactNode }> = ({ children }
 };
 
 // Hook customizado para usar o Contexto de Clientes
-// Certifique-se de que esta linha está exatamente assim:
 export const useCustomers = (): CustomerContextType => {
   const context = useContext(CustomerContext);
   if (context === undefined) {

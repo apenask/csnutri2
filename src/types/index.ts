@@ -145,6 +145,30 @@ export interface SystemBackup {
   };
 }
 
+// src/types/index.ts
+// ... outras interfaces ...
+
+export interface PaymentDetail {
+  method: 'cash' | 'credit' | 'debit' | 'pix' | string;
+  amount: number;
+  transactionId?: string;
+}
+
+export interface Sale {
+  id: string;
+  date: string;
+  items: SaleItem[];
+  total: number;
+  payments: PaymentDetail[]; // <--- Array para múltiplos pagamentos
+  customerId?: string;
+  userId: string;
+  pointsEarned?: number;
+  // paymentMethod: string; // <--- Esta linha não existe no seu tipo atual, o que é bom!
+                           // No entanto, o mockData e POSPage usam um paymentMethod singular.
+}
+
+// ... outras interfaces ...
+
 // CORREÇÃO: Removidos os tipos relacionados a chart.js se não estiverem sendo usados
 // export type ReportData = {
 //   labels: string[];

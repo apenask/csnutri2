@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, DollarSign as IconDollar, Search } from 'lucide-react';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button'; // Ainda usado para outros botões
+import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { Product, Customer, SaleItem, Sale } from '../types';
+import { Product, Customer, SaleItem, Sale, PaymentDetail } from '../types'; // Adicionado PaymentDetail para clareza
 import { useAuth } from '../context/AuthContext';
 import { useCustomers } from '../context/CustomerContext';
 import { useSales } from '../context/SaleContext';
@@ -98,12 +98,17 @@ const POSPage: React.FC = () => {
     }
     setIsSubmittingSale(true);
     
+    // CORREÇÃO APLICADA AQUI
+    const salePayments: PaymentDetail[] = [{ method: paymentMethod, amount: total }];
+    // Se você fosse suportar múltiplos pagamentos, você construiria este array de forma diferente
+    // com base na entrada do usuário no modal de pagamento.
+
     const saleDataToSave: Omit<Sale, 'id'> = {
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString().split('T')[0], // Usar apenas a data
       items: cart,
       total: total,
+      payments: salePayments, // <--- CORRIGIDO para usar o array
       customerId: selectedCustomer ? selectedCustomer.id : undefined,
-      paymentMethod: paymentMethod,
       userId: currentUser?.id || 'system',
       pointsEarned: total > 0 ? Math.floor(total / 10) : undefined,
     };
@@ -116,6 +121,7 @@ const POSPage: React.FC = () => {
         const productInContext = productsFromContext.find(p => p.id === item.productId);
         if (productInContext) {
           const newStock = productInContext.stock - item.quantity;
+          // A função updateProduct em ProductContext já lida com a atualização direta do estoque.
           await updateProductStock(item.productId, { stock: newStock });
         }
       }
@@ -135,7 +141,7 @@ const POSPage: React.FC = () => {
 
       setCart([]);
       setSelectedCustomer(null);
-      setPaymentMethod('cash');
+      setPaymentMethod('cash'); // Reset para o método padrão
       setAmountPaid('');
       setChange(0);
       setShowPaymentModal(false);
@@ -284,7 +290,6 @@ const POSPage: React.FC = () => {
                           </div>
                           <div className="flex-shrink-0 ml-2">
                             <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-1 text-right">{formatCurrency(item.subtotal)}</p>
-                            {/* ÁREA DOS BOTÕES DO CARRINHO - AJUSTADA */}
                             <div className="flex items-center justify-end space-x-1">
                               <button
                                 type="button"
@@ -356,7 +361,7 @@ const POSPage: React.FC = () => {
                           key={method}
                           variant={paymentMethod === method ? 'primary' : 'outline'} 
                           onClick={() => setPaymentMethod(method)}
-                          className="w-full text-xs sm:text-sm" // Botões do modal podem ser menores
+                          className="w-full text-xs sm:text-sm"
                       >
                           {method === 'cash' && <Banknote size={16} className="mr-1 sm:mr-2" />}
                           {(method === 'credit' || method === 'debit') && <CreditCard size={16} className="mr-1 sm:mr-2" />}

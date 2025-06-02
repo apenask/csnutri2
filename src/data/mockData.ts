@@ -1,4 +1,4 @@
-import { User, Product, Customer, Sale, Expense, Supplier, StockTransaction } from '../types';
+import { User, Product, Customer, Sale, Expense, Supplier } from '../types'; // Removido StockTransaction e PaymentDetail da importação direta
 import { format, subDays } from 'date-fns';
 
 // Mock Users
@@ -8,6 +8,7 @@ export const users: User[] = [
     username: 'admin',
     password: 'admin123', // In real app, this would be hashed
     name: 'Admin User',
+    email: 'admin@email.com',
     role: 'admin',
   },
   {
@@ -15,6 +16,7 @@ export const users: User[] = [
     username: 'user',
     password: 'user123', // In real app, this would be hashed
     name: 'Regular User',
+    email: 'user@email.com',
     role: 'user',
   },
 ];
@@ -76,6 +78,9 @@ export const customers: Customer[] = [
     phone: '(11) 98765-4321',
     email: 'joao.silva@email.com',
     address: 'Rua das Flores, 123',
+    points: 120,
+    totalSpent: 1200.50,
+    totalPurchases: 8,
   },
   {
     id: '2',
@@ -83,12 +88,19 @@ export const customers: Customer[] = [
     phone: '(11) 91234-5678',
     email: 'maria.oliveira@email.com',
     address: 'Av. Paulista, 1000',
+    points: 80,
+    totalSpent: 800.00,
+    totalPurchases: 5,
   },
   {
     id: '3',
     name: 'Pedro Santos',
     phone: '(11) 95555-9999',
     email: 'pedro.santos@email.com',
+    address: '', // Endereço pode ser opcional ou string vazia
+    points: 40,
+    totalSpent: 400.00,
+    totalPurchases: 2,
   },
 ];
 
@@ -123,9 +135,10 @@ export const sales: Sale[] = [
       { productId: '5', quantity: 3, price: 12.90, subtotal: 38.70 },
     ],
     total: 438.50,
+    payments: [{ method: 'credit', amount: 438.50 }], 
     customerId: '1',
-    paymentMethod: 'credit',
     userId: '1',
+    pointsEarned: Math.floor(438.50 / 10),
   },
   {
     id: '2',
@@ -135,9 +148,10 @@ export const sales: Sale[] = [
       { productId: '4', quantity: 1, price: 129.90, subtotal: 129.90 },
     ],
     total: 209.80,
+    payments: [{ method: 'pix', amount: 209.80 }], 
     customerId: '2',
-    paymentMethod: 'pix',
     userId: '1',
+    pointsEarned: Math.floor(209.80 / 10),
   },
   {
     id: '3',
@@ -146,8 +160,9 @@ export const sales: Sale[] = [
       { productId: '2', quantity: 2, price: 89.90, subtotal: 179.80 },
     ],
     total: 179.80,
-    paymentMethod: 'cash',
+    payments: [{ method: 'cash', amount: 179.80 }], 
     userId: '1',
+    pointsEarned: Math.floor(179.80 / 10),
   },
   {
     id: '4',
@@ -158,9 +173,10 @@ export const sales: Sale[] = [
       { productId: '5', quantity: 2, price: 12.90, subtotal: 25.80 },
     ],
     total: 305.60,
+    payments: [{ method: 'debit', amount: 305.60 }], 
     customerId: '3',
-    paymentMethod: 'debit',
     userId: '1',
+    pointsEarned: Math.floor(305.60 / 10),
   },
   {
     id: '5',
@@ -169,9 +185,10 @@ export const sales: Sale[] = [
       { productId: '4', quantity: 2, price: 129.90, subtotal: 259.80 },
     ],
     total: 259.80,
+    payments: [{ method: 'credit', amount: 259.80 }], 
     customerId: '1',
-    paymentMethod: 'credit',
     userId: '1',
+    pointsEarned: Math.floor(259.80 / 10),
   },
 ];
 
@@ -182,7 +199,7 @@ export const expenses: Expense[] = [
     date: getDate(6),
     description: 'Compra de estoque - Whey Protein',
     amount: 1200.00,
-    category: 'Inventory',
+    category: 'Inventory', 
     supplierId: '1',
   },
   {
@@ -216,81 +233,8 @@ export const expenses: Expense[] = [
   },
 ];
 
-// Mock Stock Transactions
-export const stockTransactions: StockTransaction[] = [
-  {
-    id: '1',
-    date: getDate(7),
-    productId: '1',
-    quantity: 30,
-    type: 'in',
-    reason: 'Initial stock',
-  },
-  {
-    id: '2',
-    date: getDate(7),
-    productId: '2',
-    quantity: 20,
-    type: 'in',
-    reason: 'Initial stock',
-  },
-  {
-    id: '3',
-    date: getDate(7),
-    productId: '3',
-    quantity: 20,
-    type: 'in',
-    reason: 'Initial stock',
-  },
-  {
-    id: '4',
-    date: getDate(7),
-    productId: '4',
-    quantity: 15,
-    type: 'in',
-    reason: 'Initial stock',
-  },
-  {
-    id: '5',
-    date: getDate(7),
-    productId: '5',
-    quantity: 50,
-    type: 'in',
-    reason: 'Initial stock',
-  },
-  {
-    id: '6',
-    date: getDate(1),
-    productId: '1',
-    quantity: 2,
-    type: 'out',
-    reason: 'Sale #1',
-  },
-  {
-    id: '7',
-    date: getDate(1),
-    productId: '5',
-    quantity: 3,
-    type: 'out',
-    reason: 'Sale #1',
-  },
-  {
-    id: '8',
-    date: getDate(2),
-    productId: '3',
-    quantity: 1,
-    type: 'out',
-    reason: 'Sale #2',
-  },
-  {
-    id: '9',
-    date: getDate(2),
-    productId: '4',
-    quantity: 1,
-    type: 'out',
-    reason: 'Sale #2',
-  },
-];
+// Mock Stock Transactions removido para evitar erro, já que o tipo não está definido/exportado
+// export const stockTransactions: StockTransaction[] = [ ... ];
 
 // Generate sales data for chart
 export const generateSalesData = (days: number) => {
@@ -300,14 +244,14 @@ export const generateSalesData = (days: number) => {
     const dailyTotal = daysSales.reduce((sum, sale) => sum + sale.total, 0);
     
     return {
-      date,
-      sales: dailyTotal,
+      date, 
+      sales: dailyTotal, 
     };
   });
 };
 
 // Generate financial summary
-export const getFinancialSummary = (period: string): { income: number; expenses: number; balance: number } => {
+export const getFinancialSummary = (period: string): { income: number; expenses: number; balance: number, period: string } => {
   const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0);
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   
@@ -315,6 +259,6 @@ export const getFinancialSummary = (period: string): { income: number; expenses:
     income: totalSales,
     expenses: totalExpenses,
     balance: totalSales - totalExpenses,
-    period
+    period 
   };
 };
