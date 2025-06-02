@@ -5,13 +5,16 @@ import { getFirestore } from "firebase/firestore";
 
 // Suas credenciais do Firebase (do console do Firebase)
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_AUTH_DOMAIN",
-  projectId: "SEU_PROJECT_ID",
-  storageBucket: "SEU_STORAGE_BUCKET",
-  messagingSenderId: "SEU_MESSAGING_SENDER_ID",
-  appId: "SEU_APP_ID"
+  apiKey: "AIzaSyDQjRv_HlOKY3g5ebq_cK577_Os53kgWpc",
+  authDomain: "cs-nutri.firebaseapp.com",
+  databaseURL: "https://cs-nutri-default-rtdb.firebaseio.com",
+  projectId: "cs-nutri",
+  storageBucket: "cs-nutri.firebasestorage.app",
+  messagingSenderId: "398504414133",
+  appId: "1:398504414133:web:5daf6bcb439a494759e7fc",
+  measurementId: "G-K350KXKX05"
 };
+
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
