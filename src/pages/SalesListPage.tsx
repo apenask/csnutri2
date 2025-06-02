@@ -26,7 +26,6 @@ const SalesListPage: React.FC = () => {
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
   const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-  // Estados para o modal de confirmação de exclusão
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [saleIdToDelete, setSaleIdToDelete] = useState<string | null>(null);
 
@@ -88,7 +87,7 @@ const SalesListPage: React.FC = () => {
         const itemsMatch = sale.items.some(item => getProductName(item.productId).toLowerCase().includes(searchTermLower));
         const customerMatch = customerName.includes(searchTermLower);
         const sellerMatch = sellerName.includes(searchTermLower);
-        const dateMatch = filterDate ? sale.date === filterDate : true; 
+        const dateMatch = filterDate ? sale.date.startsWith(filterDate) : true; // Ajustado para corresponder ao início da string da data
         return (customerMatch || saleIdMatch || itemsMatch || sellerMatch) && dateMatch;
       })
       .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
@@ -123,7 +122,7 @@ const SalesListPage: React.FC = () => {
 
   const handleOpenEditModal = (sale: Sale) => {
     setSelectedSale(sale);
-    setEditFormData({ date: sale.date, customerId: sale.customerId });
+    setEditFormData({ date: sale.date ? sale.date.split('T')[0] : '', customerId: sale.customerId }); // Garante que a data esteja no formato yyyy-MM-dd
     setShowEditModal(true);
   };
 
@@ -141,10 +140,11 @@ const SalesListPage: React.FC = () => {
     }
     setIsSubmittingAction(true);
     try {
-      const dateToSave = editFormData.date.split('T')[0]; 
+      // A data já deve estar no formato yyyy-MM-dd do input type="date"
       await updateSale(selectedSale.id, {
-        date: dateToSave,
+        date: editFormData.date, // Mantém a data como está (yyyy-MM-dd)
         customerId: editFormData.customerId || undefined,
+        // paymentMethod não é mais atualizado aqui, pois usamos o array 'payments'
       });
       setShowEditModal(false);
       setSelectedSale(null);
@@ -213,15 +213,16 @@ const SalesListPage: React.FC = () => {
                         </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center text-sm font-medium">
-                      <div className="flex items-center justify-center space-x-1">
-                        <Button variant="outline" size="sm" onClick={() => handleOpenViewModal(sale)} className="p-1.5 h-8 w-8 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Ver Detalhes">
-                          <Eye size={16} className="text-blue-600 dark:text-blue-400" />
+                      {/* ÍCONES DE AÇÃO CORRIGIDOS */}
+                      <div className="flex items-center justify-center space-x-2"> {/* Aumentado space-x-1 para space-x-2 */}
+                        <Button variant="outline" size="sm" onClick={() => handleOpenViewModal(sale)} className="p-2 h-9 w-9 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Ver Detalhes">
+                          <Eye size={18} className="text-blue-600 dark:text-blue-400" /> {/* Aumentado size para 18 */}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(sale)} className="p-1.5 h-8 w-8 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Editar Venda">
-                          <Edit size={16} className="text-yellow-600 dark:text-yellow-400" />
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(sale)} className="p-2 h-9 w-9 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Editar Venda">
+                          <Edit size={18} className="text-yellow-600 dark:text-yellow-400" /> {/* Aumentado size para 18 */}
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => requestDeleteSale(sale.id)} className="p-1.5 h-8 w-8 !rounded-md border-red-300 text-red-500 hover:bg-red-50 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-500/20" disabled={isSubmittingAction} title="Excluir Venda">
-                          <Trash2 size={16} />
+                        <Button variant="outline" size="sm" onClick={() => requestDeleteSale(sale.id)} className="p-2 h-9 w-9 !rounded-md border-red-300 text-red-500 hover:bg-red-50 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-500/20" disabled={isSubmittingAction} title="Excluir Venda">
+                          <Trash2 size={18} /> {/* Aumentado size para 18 */}
                         </Button>
                       </div>
                     </td>
@@ -260,6 +261,7 @@ const SalesListPage: React.FC = () => {
                     value={editFormData.date ? editFormData.date.split('T')[0] : ''}
                     onChange={handleEditFormChange}
                     fullWidth
+                    required
                   />
                   <div>
                     <label
@@ -320,7 +322,8 @@ const SalesListPage: React.FC = () => {
         message="Tem certeza que deseja excluir esta venda? Esta ação não poderá ser desfeita e tentará restaurar o estoque dos produtos."
         confirmButtonText="Excluir Venda"
         confirmButtonVariant="danger"
-        icon={Trash2} // Usando Trash2, pode ser AlertTriangle se preferir e importado.
+        icon={Trash2} 
+        isSubmitting={isSubmittingAction}
       />
     </div>
   );
