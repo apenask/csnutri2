@@ -87,7 +87,7 @@ const SalesListPage: React.FC = () => {
         const itemsMatch = sale.items.some(item => getProductName(item.productId).toLowerCase().includes(searchTermLower));
         const customerMatch = customerName.includes(searchTermLower);
         const sellerMatch = sellerName.includes(searchTermLower);
-        const dateMatch = filterDate ? sale.date.startsWith(filterDate) : true; // Ajustado para corresponder ao início da string da data
+        const dateMatch = filterDate ? sale.date.startsWith(filterDate) : true; 
         return (customerMatch || saleIdMatch || itemsMatch || sellerMatch) && dateMatch;
       })
       .sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
@@ -122,7 +122,7 @@ const SalesListPage: React.FC = () => {
 
   const handleOpenEditModal = (sale: Sale) => {
     setSelectedSale(sale);
-    setEditFormData({ date: sale.date ? sale.date.split('T')[0] : '', customerId: sale.customerId }); // Garante que a data esteja no formato yyyy-MM-dd
+    setEditFormData({ date: sale.date ? sale.date.split('T')[0] : '', customerId: sale.customerId }); 
     setShowEditModal(true);
   };
 
@@ -140,11 +140,9 @@ const SalesListPage: React.FC = () => {
     }
     setIsSubmittingAction(true);
     try {
-      // A data já deve estar no formato yyyy-MM-dd do input type="date"
       await updateSale(selectedSale.id, {
-        date: editFormData.date, // Mantém a data como está (yyyy-MM-dd)
+        date: editFormData.date, 
         customerId: editFormData.customerId || undefined,
-        // paymentMethod não é mais atualizado aqui, pois usamos o array 'payments'
       });
       setShowEditModal(false);
       setSelectedSale(null);
@@ -213,16 +211,16 @@ const SalesListPage: React.FC = () => {
                         </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-center text-sm font-medium">
-                      {/* ÍCONES DE AÇÃO CORRIGIDOS */}
-                      <div className="flex items-center justify-center space-x-2"> {/* Aumentado space-x-1 para space-x-2 */}
-                        <Button variant="outline" size="sm" onClick={() => handleOpenViewModal(sale)} className="p-2 h-9 w-9 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Ver Detalhes">
-                          <Eye size={18} className="text-blue-600 dark:text-blue-400" /> {/* Aumentado size para 18 */}
+                      {/* ÍCONES DE AÇÃO CORRIGIDOS E AUMENTADOS */}
+                      <div className="flex items-center justify-center space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleOpenViewModal(sale)} className="p-2.5 h-10 w-10 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700 flex items-center justify-center" disabled={isSubmittingAction} title="Ver Detalhes">
+                          <Eye size={20} className="text-blue-600 dark:text-blue-400" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(sale)} className="p-2 h-9 w-9 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700" disabled={isSubmittingAction} title="Editar Venda">
-                          <Edit size={18} className="text-yellow-600 dark:text-yellow-400" /> {/* Aumentado size para 18 */}
+                        <Button variant="outline" size="sm" onClick={() => handleOpenEditModal(sale)} className="p-2.5 h-10 w-10 !rounded-md dark:border-gray-600 dark:hover:bg-gray-700 flex items-center justify-center" disabled={isSubmittingAction} title="Editar Venda">
+                          <Edit size={20} className="text-yellow-600 dark:text-yellow-400" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => requestDeleteSale(sale.id)} className="p-2 h-9 w-9 !rounded-md border-red-300 text-red-500 hover:bg-red-50 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-500/20" disabled={isSubmittingAction} title="Excluir Venda">
-                          <Trash2 size={18} /> {/* Aumentado size para 18 */}
+                        <Button variant="outline" size="sm" onClick={() => requestDeleteSale(sale.id)} className="p-2.5 h-10 w-10 !rounded-md border-red-300 text-red-500 hover:bg-red-50 dark:border-red-500/70 dark:text-red-400 dark:hover:bg-red-500/20 flex items-center justify-center" disabled={isSubmittingAction} title="Excluir Venda">
+                          <Trash2 size={20} />
                         </Button>
                       </div>
                     </td>
