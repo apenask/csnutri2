@@ -1,21 +1,20 @@
 import React from 'react';
-import { useAuth } from '../../context/AuthContext'; //
-import { Menu, Bell, User, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+// import { useAuth } from '../../context/AuthContext'; // Não é mais necessário se removermos o menu do usuário daqui
+import { Menu, Bell } from 'lucide-react'; // Removido User e LogOut se não forem mais usados aqui
+// import { useNavigate } from 'react-router-dom'; // Não é mais necessário se removermos a navegação do perfil daqui
 
 interface HeaderProps {
   openSidebar: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
-  const { currentUser, logout } = useAuth(); //
-  const navigate = useNavigate();
-  const [showUserMenu, setShowUserMenu] = React.useState(false);
+  // const { currentUser, logout } = useAuth(); // Removido se não usado
+  // const navigate = useNavigate(); // Removido se não usado
+  // const [showUserMenu, setShowUserMenu] = React.useState(false); // Removido
 
-  const handleLogout = () => {
-    logout();
-    // navigate('/login'); // O Layout já redireciona se não autenticado
-  };
+  // const handleLogout = () => { // Removido se o logout for apenas pela sidebar
+  //   logout();
+  // };
 
   return (
     <header className="sticky top-0 z-30 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow dark:border-b dark:border-gray-700">
@@ -29,8 +28,7 @@ const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
       </button>
       <div className="flex-1 px-4 flex justify-between">
         <div className="flex-1 flex items-center">
-          {/* Título CS Nutri no Header pode ser removido se já estiver na Sidebar, ou estilizado */}
-          {/* <h1 className="text-2xl font-semibold text-red-600">CS Nutri</h1> */}
+          {/* Espaço para possível título ou busca no futuro, se necessário */}
         </div>
         <div className="ml-4 flex items-center md:ml-6">
           <button
@@ -41,13 +39,13 @@ const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
             <Bell className="h-6 w-6" aria-hidden="true" />
           </button>
 
-          {/* Profile dropdown */}
-          <div className="ml-3 relative">
+          {/* Profile dropdown REMOVIDO */}
+          {/* <div className="ml-3 relative">
             <div>
               <button
                 type="button"
                 className="max-w-xs bg-white dark:bg-gray-800 flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-red-500"
-                id="user-menu-button" // Adicionado id para aria-controls
+                id="user-menu-button"
                 aria-expanded={showUserMenu}
                 aria-haspopup="true"
                 onClick={() => setShowUserMenu(!showUserMenu)}
@@ -99,7 +97,8 @@ const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
                 </a>
               </div>
             )}
-          </div>
+          </div> 
+          */}
         </div>
       </div>
     </header>

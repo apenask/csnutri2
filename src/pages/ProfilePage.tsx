@@ -1,16 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Card from '../components/ui/Card';
-import Button from '../components/ui/Button'; // Usado
-import Input from '../components/ui/Input'; // Usado
+import Button from '../components/ui/Button'; 
+import Input from '../components/ui/Input'; 
+import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-// Ícones: Camera e Link2 não são usados diretamente se o input file/url for o principal. UserIcon e TrashIcon são usados.
-import { User as UserIcon, Trash2 as TrashIcon /*, Camera, Link2 */ } from 'lucide-react'; 
+import { User as UserIcon, Trash2 as TrashIcon } from 'lucide-react'; 
 import { useTranslation } from 'react-i18next';
-// UserType não é explicitamente anotado aqui, currentUser já vem tipado do AuthContext
 
 // Função de simulação de upload
-const simulateUpload = (file: File): Promise<string> => { // 'file' é usado aqui
+const simulateUpload = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const reader = new FileReader();
@@ -29,7 +28,7 @@ const simulateUpload = (file: File): Promise<string> => { // 'file' é usado aqu
 
 const ProfilePage: React.FC = () => {
   const { currentUser, updateUserProfile, changeUserPassword } = useAuth();
-  const { theme } = useTheme();
+  const { theme } = useTheme(); // theme não está sendo usado diretamente para estilização aqui, mas pode ser mantido
   const { t } = useTranslation();
 
   const [name, setName] = useState(currentUser?.name || '');
@@ -41,14 +40,17 @@ const ProfilePage: React.FC = () => {
   
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [profilePicUrlInput, setProfilePicUrlInput] = useState(currentUser?.profilePictureUrl || '');
-  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(currentUser?.profilePictureUrl || null); // Usado para exibir a imagem
+  const [profilePicPreview, setProfilePicPreview] = useState<string | null>(currentUser?.profilePictureUrl || null);
   
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null); // Usado para feedback
-  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false); // Usado nos botões
-  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false); // Usado nos botões
-  const [isSubmittingPicture, setIsSubmittingPicture] = useState(false); // Usado nos botões
+  const [pageMessage, setPageMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [isSubmittingPicture, setIsSubmittingPicture] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null); // Usado
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estado para o modal de confirmação de remoção de foto
+  const [showRemovePicConfirmModal, setShowRemovePicConfirmModal] = useState(false);
 
   useEffect(() => {
     if (currentUser) {
@@ -60,7 +62,15 @@ const ProfilePage: React.FC = () => {
     }
   }, [currentUser]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => { // 'event' é usado
+  // Efeito para limpar a mensagem da página após alguns segundos
+  useEffect(() => {
+    if (pageMessage) {
+      const timer = setTimeout(() => setPageMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [pageMessage]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; 
     if (file) {
       setProfilePicFile(file);
@@ -73,90 +83,95 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const handleProfilePicUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => { // 'event' é usado
+  const handleProfilePicUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const url = event.target.value; 
     setProfilePicUrlInput(url);
     setProfilePicPreview(url); 
     setProfilePicFile(null); 
   };
 
-  const handleSaveProfilePicture = useCallback(async () => { // Usado no onClick do botão
+  const handleSaveProfilePicture = useCallback(async () => {
     if (!currentUser) return;
     if (!profilePicFile && !profilePicUrlInput.trim()) {
-      setMessage({ type: 'error', text: t('no_profile_picture_selected') });
+      setPageMessage({ type: 'error', text: t('no_profile_picture_selected') });
       return;
     }
     
-    setIsSubmittingPicture(true); // Usado
-    setMessage(null); // Usado
+    setIsSubmittingPicture(true); 
+    setPageMessage(null); 
     let newPictureUrl: string | undefined = undefined;
 
     try {
       if (profilePicFile) {
-        newPictureUrl = await simulateUpload(profilePicFile); // simulateUpload é usado
+        newPictureUrl = await simulateUpload(profilePicFile); 
       } else if (profilePicUrlInput.trim()) {
         newPictureUrl = profilePicUrlInput.trim();
       }
       
       await updateUserProfile(currentUser.id, { profilePictureUrl: newPictureUrl || '' });
-      setMessage({ type: 'success', text: t('profile_picture_updated_success') });
+      setPageMessage({ type: 'success', text: t('profile_picture_updated_success') });
       setProfilePicFile(null); 
     } catch (err) {
-      setMessage({ type: 'error', text: `${t('profile_picture_upload_error')} ${err instanceof Error ? err.message : String(err)}` });
+      setPageMessage({ type: 'error', text: `${t('profile_picture_upload_error')} ${err instanceof Error ? err.message : String(err)}` });
     } finally {
-      setIsSubmittingPicture(false); // Usado
+      setIsSubmittingPicture(false); 
     }
   }, [currentUser, profilePicFile, profilePicUrlInput, t, updateUserProfile]);
   
-  const handleRemoveProfilePicture = useCallback(async () => { // Usado no onClick do botão
+  const requestRemoveProfilePicture = () => {
+    setPageMessage(null);
+    setShowRemovePicConfirmModal(true);
+  };
+
+  const confirmRemoveProfilePicture = useCallback(async () => { 
     if (!currentUser) return;
-    if (confirm(t('confirm_remove_picture'))) {
-        setIsSubmittingPicture(true); // Usado
-        setMessage(null); // Usado
-        try {
-            await updateUserProfile(currentUser.id, { profilePictureUrl: '' }); 
-            setProfilePicPreview(null);
-            setProfilePicUrlInput('');
-            setProfilePicFile(null);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            setMessage({ type: 'success', text: t('profile_picture_removed_success') });
-        } catch (err) {
-            setMessage({ type: 'error', text: `${t('profile_picture_remove_error')} ${err instanceof Error ? err.message : String(err)}` });
-        } finally {
-            setIsSubmittingPicture(false); // Usado
-        }
+    
+    setIsSubmittingPicture(true); 
+    setPageMessage(null);
+    setShowRemovePicConfirmModal(false); // Fecha o modal ao iniciar a ação
+    try {
+        await updateUserProfile(currentUser.id, { profilePictureUrl: '' }); 
+        setProfilePicPreview(null);
+        setProfilePicUrlInput('');
+        setProfilePicFile(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        setPageMessage({ type: 'success', text: t('profile_picture_removed_success') });
+    } catch (err) {
+        setPageMessage({ type: 'error', text: `${t('profile_picture_remove_error')} ${err instanceof Error ? err.message : String(err)}` });
+    } finally {
+        setIsSubmittingPicture(false); 
     }
   }, [currentUser, updateUserProfile, t]);
 
-  const handleProfileInfoUpdate = useCallback(async (e: React.FormEvent) => { // 'e' é usado; função usada no onSubmit do form
+  const handleProfileInfoUpdate = useCallback(async (e: React.FormEvent) => { 
     e.preventDefault();
     if (!currentUser) return;
-    if (!name.trim() || !username.trim()) { setMessage({ type: 'error', text: t('name_username_required') }); return; }
-    setIsSubmittingProfile(true); setMessage(null); // Usados
+    if (!name.trim() || !username.trim()) { setPageMessage({ type: 'error', text: t('name_username_required') }); return; }
+    setIsSubmittingProfile(true); setPageMessage(null); 
     try {
       await updateUserProfile(currentUser.id, { name, username });
-      setMessage({ type: 'success', text: t('profile_info_updated_success') });
+      setPageMessage({ type: 'success', text: t('profile_info_updated_success') });
     } catch (err) {
-      setMessage({ type: 'error', text: `${t('profile_update_error')} ${err instanceof Error ? err.message : String(err)}` });
-    } finally { setIsSubmittingProfile(false); } // Usado
+      setPageMessage({ type: 'error', text: `${t('profile_update_error')} ${err instanceof Error ? err.message : String(err)}` });
+    } finally { setIsSubmittingProfile(false); } 
   }, [currentUser, name, username, updateUserProfile, t]);
 
-  const handleChangePassword = useCallback(async (e: React.FormEvent) => { // 'e' é usado; função usada no onSubmit do form
+  const handleChangePassword = useCallback(async (e: React.FormEvent) => { 
     e.preventDefault();
     if (!currentUser) return;
-    if (!currentPassword || !newPassword || !confirmPassword) { setMessage({ type: 'error', text: t('all_password_fields_required')}); return; }
-    if (newPassword !== confirmPassword) { setMessage({ type: 'error', text: t('passwords_do_not_match') }); return; }
-    if (newPassword.length < 6) { setMessage({ type: 'error', text: t('password_min_length') }); return; }
-    setIsSubmittingPassword(true); setMessage(null); // Usados
+    if (!currentPassword || !newPassword || !confirmPassword) { setPageMessage({ type: 'error', text: t('all_password_fields_required')}); return; }
+    if (newPassword !== confirmPassword) { setPageMessage({ type: 'error', text: t('passwords_do_not_match') }); return; }
+    if (newPassword.length < 6) { setPageMessage({ type: 'error', text: t('password_min_length') }); return; }
+    setIsSubmittingPassword(true); setPageMessage(null); 
     try {
       await changeUserPassword(currentUser.id, currentPassword, newPassword);
-      setCurrentPassword('');     // Usado
-      setNewPassword('');         // Usado
-      setConfirmPassword('');     // Usado
-      setMessage({ type: 'success', text: t('password_changed_success') });
+      setCurrentPassword('');     
+      setNewPassword('');         
+      setConfirmPassword('');     
+      setPageMessage({ type: 'success', text: t('password_changed_success') });
     } catch (err) {
-      setMessage({ type: 'error', text: `${t('password_change_error')} ${err instanceof Error ? err.message : String(err)}` });
-    } finally { setIsSubmittingPassword(false); } // Usado
+      setPageMessage({ type: 'error', text: `${t('password_change_error')} ${err instanceof Error ? err.message : String(err)}` });
+    } finally { setIsSubmittingPassword(false); } 
   }, [currentUser, currentPassword, newPassword, confirmPassword, changeUserPassword, t]);
 
 
@@ -170,18 +185,18 @@ const ProfilePage: React.FC = () => {
     <div className="p-4 md:p-6 text-gray-800 dark:text-gray-200">
       <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-50 mb-8">{t('profile')}</h1>
       
-      {message && (
-        <div className={`mb-6 p-4 rounded-md text-sm ${ message.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
-          {message.text}
+      {pageMessage && (
+        <div className={`mb-6 p-4 rounded-md text-sm ${ pageMessage.type === 'success' ? 'bg-green-50 dark:bg-green-500/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-500/20 text-red-700 dark:text-red-400'}`}>
+          {pageMessage.text}
         </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
         <div className="md:col-span-1 space-y-6">
-          <Card> {/* Card da foto de perfil */}
+          <Card> 
             <div className="flex flex-col items-center p-2">
               <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 mb-4 ring-4 ring-red-500/50 dark:ring-red-500/30">
-                {profilePicPreview ? ( // Usado
+                {profilePicPreview ? ( 
                   <img src={profilePicPreview} alt={name} className="w-full h-full object-cover" />
                 ) : (
                   <UserIcon className="w-20 h-20 sm:w-24 sm:h-24 text-gray-400 dark:text-gray-500 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
@@ -210,7 +225,7 @@ const ProfilePage: React.FC = () => {
                   {isSubmittingPicture ? t('uploading') : t('save_picture')}
                 </Button>
                 {(profilePicPreview || currentUser.profilePictureUrl) && (
-                  <Button variant="danger" onClick={handleRemoveProfilePicture} disabled={isSubmittingPicture} className="flex-1">
+                  <Button variant="danger" onClick={requestRemoveProfilePicture} disabled={isSubmittingPicture} className="flex-1">
                     <TrashIcon size={16} className="mr-2"/> {t('remove_picture')}
                   </Button>
                 )}
@@ -230,17 +245,33 @@ const ProfilePage: React.FC = () => {
 
           <Card title={changePasswordTitle}>
             <form onSubmit={handleChangePassword} className="space-y-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400 -mb-2">{t('leave_fields_blank_to_not_change')}</p> {/* Ajustado margin-bottom */}
-              <Input label={t('current_password')} type="password" id="currentPassword" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} fullWidth required={!!newPassword} /> {/* Senha atual só é obrigatória se for mudar a nova */}
+              <p className="text-sm text-gray-600 dark:text-gray-400 -mb-2">{t('leave_fields_blank_to_not_change')}</p>
+              <Input label={t('current_password')} type="password" id="currentPassword" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} fullWidth required={!!newPassword} />
               <Input label={t('new_password')} type="password" id="newPassword" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} fullWidth />
               <Input label={t('confirm_new_password')} type="password" id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} fullWidth />
-              <Button type="submit" isLoading={isSubmittingPassword} disabled={isSubmittingPassword || (!currentPassword && !!newPassword) }> {/* Desabilita se nova senha for preenchida mas atual não */}
+              <Button type="submit" isLoading={isSubmittingPassword} disabled={isSubmittingPassword || (!currentPassword && !!newPassword) }>
                 {isSubmittingPassword ? t('changing_password_loading') : t('change_password_button')}
               </Button>
             </form>
           </Card>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={showRemovePicConfirmModal}
+        onClose={() => {
+            if(!isSubmittingPicture) { // Só permite fechar se não estiver submetendo
+                setShowRemovePicConfirmModal(false);
+            }
+        }}
+        onConfirm={confirmRemoveProfilePicture}
+        title={t('confirm_remove_picture_title') || "Confirmar Remoção da Foto"} // Adicionar tradução para o título
+        message={t('confirm_remove_picture') || "Tem certeza que deseja remover sua foto de perfil?"}
+        confirmButtonText={t('remove_picture_confirm_button') || "Remover Foto"} // Adicionar tradução
+        confirmButtonVariant="danger"
+        icon={TrashIcon}
+        isSubmitting={isSubmittingPicture}
+      />
     </div>
   );
 };

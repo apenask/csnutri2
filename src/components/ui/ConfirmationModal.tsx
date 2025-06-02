@@ -73,13 +73,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             </div>
         </div>
         {/* Rodapé com Botões */}
-        {/* Alterado para sm:justify-between para alinhar os botões às extremidades */}
-        <div className="px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:justify-between gap-3"> 
-          {/* Botões com largura automática em telas sm e maiores, e ordem mantida */}
+        {/* Reduzido o gap para sm:gap-2 */}
+        <div className="px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:justify-between sm:gap-2 gap-3"> 
+          {/* A ordem no JSX define a ordem visual (Cancelar à esquerda, Confirmar à direita) com justify-between */}
           <Button
             variant="outline"
             onClick={handleClose}
-            className="w-full sm:w-auto mt-2 sm:mt-0" // sm:order-1 removido, a ordem no HTML já define
+            className="w-full sm:w-auto mt-2 sm:mt-0" 
             disabled={isSubmitting}
           >
             {cancelButtonText}
@@ -87,7 +87,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           <Button
             variant={confirmButtonVariant}
             onClick={handleConfirm}
-            className="w-full sm:w-auto" // sm:order-2 removido
+            className="w-full sm:w-auto" 
             isLoading={isSubmitting}
             disabled={isSubmitting}
           >
