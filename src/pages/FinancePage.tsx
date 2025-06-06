@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'; // Adicionado useEffect
+import React, { useState, useMemo, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
@@ -6,9 +6,9 @@ import { DollarSign, TrendingUp, TrendingDown, Plus, Filter, Trash2, Edit, Chevr
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
-import { useAuth } from '../context/AuthContext';
-import { useSales } from '../context/SaleContext';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
+import { useAuth } from '../context/useAuth';
+import { useSales } from '../context/useSales';
 import { useExpenses } from '../context/ExpenseContext';
 import { Expense } from '../types'; 
 
@@ -47,15 +47,12 @@ const FinancePage: React.FC = () => {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formError, setFormError] = useState(''); // Erro para o formulário do modal
-  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); // Mensagem para a página
+  const [formError, setFormError] = useState('');
+  const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
 
-  // Estado para o modal de confirmação de exclusão de despesa
   const [showDeleteExpenseConfirmModal, setShowDeleteExpenseConfirmModal] = useState(false);
   const [expenseIdToDelete, setExpenseIdToDelete] = useState<string | null>(null);
 
-
-  // Efeito para limpar a mensagem da página após alguns segundos
   useEffect(() => {
     if (pageMessage) {
       const timer = setTimeout(() => setPageMessage(null), 5000);
@@ -64,7 +61,7 @@ const FinancePage: React.FC = () => {
   }, [pageMessage]);
 
   const formatDateRangeDisplay = (date: Date) => {
-    return format(date, 'MMMM yyyy', { locale: ptBR }); // Corrigido para 'MMMM yyyy'
+    return format(date, 'MMMM yyyy', { locale: ptBR });
   };
 
   const changeMonth = (direction: 'prev' | 'next') => {
@@ -78,12 +75,12 @@ const FinancePage: React.FC = () => {
 
     const cms = sales.filter(sale => {
       try { const saleDate = parseISO(sale.date); return saleDate >= startDate && saleDate <= endDate; } 
-      catch (e) { console.warn("Data de venda inválida:", sale.date); return false; }
+      catch { return false; }
     });
     
     const cme = expenses.filter(expense => {
       try { const expenseDate = parseISO(expense.date); return expenseDate >= startDate && expenseDate <= endDate; }
-      catch (e) { console.warn("Data de despesa inválida:", expense.date); return false; }
+      catch { return false; }
     });
     
     const ti = cms.reduce((sum, sale) => sum + sale.total, 0);
@@ -136,13 +133,13 @@ const FinancePage: React.FC = () => {
     setPageMessage(null);
     if (!formData.description || formData.amount <= 0 || !formData.category || !formData.date) {
       setFormError("Todos os campos (Descrição, Valor > 0, Categoria, Data) são obrigatórios.");
-      return; // Mantém o modal aberto para corrigir
+      return;
     }
     setIsSubmitting(true);
     try {
       const expensePayload = {
         ...formData,
-        date: format(parseISO(formData.date), 'yyyy-MM-dd'), // Garante formato correto
+        date: format(parseISO(formData.date), 'yyyy-MM-dd'),
       };
 
       if (showEditExpenseModal && currentExpense) {
@@ -194,29 +191,9 @@ const FinancePage: React.FC = () => {
     try {
         if(!dateString) return 'N/A';
         return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR });
-    } catch(e) {
-        console.warn("Erro ao formatar data em formatDateDisplay (FinancePage):", dateString, e);
+    } catch {
         return dateString; 
     }
-  }
-
-  if (!isAdmin) { 
-    return (
-      <div className="flex justify-center items-center h-full bg-gray-100 dark:bg-gray-900">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Acesso Restrito</h1>
-          <p className="text-gray-500 dark:text-gray-400">Você não tem permissão para acessar esta página.</p>
-        </div>
-      </div>
-    );
-  }
-  if (isLoadingSales || isLoadingExpenses) { 
-    return (
-        <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-            <p className="ml-4 text-gray-700 dark:text-gray-300">Carregando dados financeiros...</p>
-        </div>
-    );
   }
 
   const combinedTransactions: CombinedTransaction[] = useMemo(() => {
@@ -239,6 +216,25 @@ const FinancePage: React.FC = () => {
         }))
     ].sort((a, b) => parseISO(b.transactionDate).getTime() - parseISO(a.transactionDate).getTime());
   }, [currentMonthSales, currentMonthExpenses]);
+  
+  if (!isAdmin) { 
+    return (
+      <div className="flex justify-center items-center h-full bg-gray-100 dark:bg-gray-900">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Acesso Restrito</h1>
+          <p className="text-gray-500 dark:text-gray-400">Você não tem permissão para acessar esta página.</p>
+        </div>
+      </div>
+    );
+  }
+  if (isLoadingSales || isLoadingExpenses) { 
+    return (
+        <div className="flex items-center justify-center h-screen bg-gray-100 dark:bg-gray-900">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+            <p className="ml-4 text-gray-700 dark:text-gray-300">Carregando dados financeiros...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 text-gray-800 dark:text-gray-200">

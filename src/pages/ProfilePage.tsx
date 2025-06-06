@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button'; 
 import Input from '../components/ui/Input'; 
-import ConfirmationModal from '../components/ui/ConfirmationModal'; // Importado
-import { useAuth } from '../context/AuthContext';
+import ConfirmationModal from '../components/ui/ConfirmationModal';
+import { useAuth } from '../context/useAuth';
 import { useTheme } from '../context/ThemeContext';
 import { User as UserIcon, Trash2 as TrashIcon } from 'lucide-react'; 
 import { useTranslation } from 'react-i18next';
@@ -28,7 +28,7 @@ const simulateUpload = (file: File): Promise<string> => {
 
 const ProfilePage: React.FC = () => {
   const { currentUser, updateUserProfile, changeUserPassword } = useAuth();
-  const { theme } = useTheme(); // theme não está sendo usado diretamente para estilização aqui, mas pode ser mantido
+  const { theme } = useTheme();
   const { t } = useTranslation();
 
   const [name, setName] = useState(currentUser?.name || '');
@@ -49,7 +49,6 @@ const ProfilePage: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estado para o modal de confirmação de remoção de foto
   const [showRemovePicConfirmModal, setShowRemovePicConfirmModal] = useState(false);
 
   useEffect(() => {
@@ -62,7 +61,6 @@ const ProfilePage: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Efeito para limpar a mensagem da página após alguns segundos
   useEffect(() => {
     if (pageMessage) {
       const timer = setTimeout(() => setPageMessage(null), 5000);
@@ -128,7 +126,7 @@ const ProfilePage: React.FC = () => {
     
     setIsSubmittingPicture(true); 
     setPageMessage(null);
-    setShowRemovePicConfirmModal(false); // Fecha o modal ao iniciar a ação
+    setShowRemovePicConfirmModal(false);
     try {
         await updateUserProfile(currentUser.id, { profilePictureUrl: '' }); 
         setProfilePicPreview(null);
@@ -164,7 +162,7 @@ const ProfilePage: React.FC = () => {
     if (newPassword.length < 6) { setPageMessage({ type: 'error', text: t('password_min_length') }); return; }
     setIsSubmittingPassword(true); setPageMessage(null); 
     try {
-      await changeUserPassword(currentUser.id, currentPassword, newPassword);
+      await changeUserPassword(newPassword);
       setCurrentPassword('');     
       setNewPassword('');         
       setConfirmPassword('');     
@@ -260,14 +258,14 @@ const ProfilePage: React.FC = () => {
       <ConfirmationModal
         isOpen={showRemovePicConfirmModal}
         onClose={() => {
-            if(!isSubmittingPicture) { // Só permite fechar se não estiver submetendo
+            if(!isSubmittingPicture) {
                 setShowRemovePicConfirmModal(false);
             }
         }}
         onConfirm={confirmRemoveProfilePicture}
-        title={t('confirm_remove_picture_title') || "Confirmar Remoção da Foto"} // Adicionar tradução para o título
+        title={t('confirm_remove_picture_title') || "Confirmar Remoção da Foto"}
         message={t('confirm_remove_picture') || "Tem certeza que deseja remover sua foto de perfil?"}
-        confirmButtonText={t('remove_picture_confirm_button') || "Remover Foto"} // Adicionar tradução
+        confirmButtonText={t('remove_picture_confirm_button') || "Remover Foto"}
         confirmButtonVariant="danger"
         icon={TrashIcon}
         isSubmitting={isSubmittingPicture}

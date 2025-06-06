@@ -3,11 +3,11 @@ import { Plus, Minus, Trash2, ShoppingCart, CreditCard, Banknote, DollarSign as 
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { Product, Customer, SaleItem, Sale, PaymentDetail } from '../types'; // Adicionado PaymentDetail para clareza
-import { useAuth } from '../context/AuthContext';
+import { Product, Customer, SaleItem, Sale, PaymentDetail } from '../types';
+import { useAuth } from '../context/useAuth';
 import { useCustomers } from '../context/CustomerContext';
-import { useSales } from '../context/SaleContext';
-import { useProducts } from '../context/ProductContext';
+import { useSales } from '../context/useSales';
+import { useProducts } from '../context/useProducts';
 
 const POSPage: React.FC = () => {
   const { currentUser } = useAuth();
@@ -56,8 +56,8 @@ const POSPage: React.FC = () => {
     const existingItem = cart.find(item => item.productId === product.id);
     const currentQuantityInCart = existingItem?.quantity || 0;
 
-    if (product.stock <= currentQuantityInCart) {
-      alert(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock > 0 ? product.stock - currentQuantityInCart : 0}`);
+    if ((product.stock || 0) <= currentQuantityInCart) {
+      alert(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock ? product.stock - currentQuantityInCart : 0}`);
       return;
     }
     if (existingItem) {
@@ -78,9 +78,9 @@ const POSPage: React.FC = () => {
     }
     const productDetails = productsFromContext.find(p => p.id === productId);
 
-    if (productDetails && newQuantity > productDetails.stock) {
+    if (productDetails && newQuantity > (productDetails.stock || 0)) {
       alert(`Estoque insuficiente. Máximo de ${productDetails.stock} unidades para ${productDetails.name}.`);
-      setCart(cart.map(item => item.productId === productId ? { ...item, quantity: productDetails.stock, subtotal: productDetails.stock * item.price } : item));
+      setCart(cart.map(item => item.productId === productId ? { ...item, quantity: productDetails.stock || 0, subtotal: (productDetails.stock || 0) * item.price } : item));
       return;
     }
     
@@ -98,16 +98,13 @@ const POSPage: React.FC = () => {
     }
     setIsSubmittingSale(true);
     
-    // CORREÇÃO APLICADA AQUI
     const salePayments: PaymentDetail[] = [{ method: paymentMethod, amount: total }];
-    // Se você fosse suportar múltiplos pagamentos, você construiria este array de forma diferente
-    // com base na entrada do usuário no modal de pagamento.
 
     const saleDataToSave: Omit<Sale, 'id'> = {
-      date: new Date().toISOString().split('T')[0], // Usar apenas a data
+      date: new Date().toISOString(),
       items: cart,
       total: total,
-      payments: salePayments, // <--- CORRIGIDO para usar o array
+      payments: salePayments,
       customerId: selectedCustomer ? selectedCustomer.id : undefined,
       userId: currentUser?.id || 'system',
       pointsEarned: total > 0 ? Math.floor(total / 10) : undefined,
@@ -120,8 +117,7 @@ const POSPage: React.FC = () => {
       for (const item of cart) {
         const productInContext = productsFromContext.find(p => p.id === item.productId);
         if (productInContext) {
-          const newStock = productInContext.stock - item.quantity;
-          // A função updateProduct em ProductContext já lida com a atualização direta do estoque.
+          const newStock = (productInContext.stock || 0) - item.quantity;
           await updateProductStock(item.productId, { stock: newStock });
         }
       }
@@ -141,7 +137,7 @@ const POSPage: React.FC = () => {
 
       setCart([]);
       setSelectedCustomer(null);
-      setPaymentMethod('cash'); // Reset para o método padrão
+      setPaymentMethod('cash');
       setAmountPaid('');
       setChange(0);
       setShowPaymentModal(false);
@@ -219,9 +215,9 @@ const POSPage: React.FC = () => {
                       <p className="font-bold text-red-700 dark:text-red-400 text-sm sm:text-base">{formatCurrency(product.price)}</p>
                       <span 
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          product.stock > product.minStock 
+                          (product.stock || 0) > (product.minStock || 0)
                             ? 'bg-green-100 text-green-700 dark:bg-green-800/40 dark:text-green-300' 
-                            : product.stock > 0 
+                            : (product.stock || 0) > 0
                               ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-800/40 dark:text-yellow-300' 
                               : 'bg-red-100 text-red-700 dark:bg-red-800/40 dark:text-red-300'
                         }`}
@@ -347,7 +343,6 @@ const POSPage: React.FC = () => {
         </div>
       </div>
       
-      {/* Modal de Pagamento */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 dark:bg-opacity-60 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
@@ -423,7 +418,6 @@ const POSPage: React.FC = () => {
           </div>
         </div>
       )}
-      {/* Modal de Sucesso */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40 dark:bg-opacity-60 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm p-6 flex flex-col items-center text-center">

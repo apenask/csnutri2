@@ -6,11 +6,12 @@ import {
 import { Calendar, DollarSign, Package, ShoppingCart, TrendingUp, TrendingDown, Users } from 'lucide-react'; 
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import { useSales } from '../context/SaleContext';
-import { useProducts } from '../context/ProductContext';
+import { useSales } from '../context/useSales';
+import { useProducts } from '../context/useProducts';
 import { useCustomers } from '../context/CustomerContext';
 import { useExpenses } from '../context/ExpenseContext';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { Sale, Product } from '../types';
 
 type DateRangeType = 'day' | 'week' | 'month';
 
@@ -43,11 +44,11 @@ const DashboardPage: React.FC = () => {
 
   const currentPeriodSales = useMemo(() => {
     if (isLoadingSales) return [];
-    return sales.filter(sale => {
+    return sales.filter((sale: Sale) => {
       try {
         const saleDate = parseISO(sale.date);
         return saleDate >= currentPeriodDateRange.start && saleDate <= currentPeriodDateRange.end;
-      } catch { return []; }
+      } catch { return false; }
     });
   }, [sales, currentPeriodDateRange, isLoadingSales]);
 
@@ -57,7 +58,7 @@ const DashboardPage: React.FC = () => {
       try {
         const expenseDate = parseISO(expense.date);
         return expenseDate >= currentPeriodDateRange.start && expenseDate <= currentPeriodDateRange.end;
-      } catch { return []; }
+      } catch { return false; }
     });
   }, [expenses, currentPeriodDateRange, isLoadingExpenses]);
   
@@ -74,31 +75,30 @@ const DashboardPage: React.FC = () => {
   const salesChartData = useMemo(() => {
     if (isLoadingSales) return [];
     const salesByDay: { [key: string]: number } = {};
-    let numberOfDaysForChart = 7;
-    if (dateRangeType === 'month') {
-        numberOfDaysForChart = Math.round((currentPeriodDateRange.end.getTime() - currentPeriodDateRange.start.getTime()) / (1000 * 3600 * 24)) +1;
-        if (numberOfDaysForChart < 1) numberOfDaysForChart = 1; // Garante pelo menos 1 dia
-    } else if (dateRangeType === 'day') {
-        numberOfDaysForChart = 1;
-    }
+    const dayDiff = Math.round((currentPeriodDateRange.end.getTime() - currentPeriodDateRange.start.getTime()) / (1000 * 3600 * 24));
+    const numberOfDaysForChart = dayDiff >= 0 ? dayDiff + 1 : 1;
+
     for (let i = 0; i < numberOfDaysForChart; i++) {
         const dateKey = format(subDays(currentPeriodDateRange.end, numberOfDaysForChart - 1 - i), 'yyyy-MM-dd');
         salesByDay[dateKey] = 0;
     }
-    currentPeriodSales.forEach(sale => {
+
+    currentPeriodSales.forEach((sale: Sale) => {
         const dayKey = format(parseISO(sale.date), 'yyyy-MM-dd');
-        if(salesByDay.hasOwnProperty(dayKey)) {
+        if(Object.prototype.hasOwnProperty.call(salesByDay, dayKey)) {
              salesByDay[dayKey] = (salesByDay[dayKey] || 0) + sale.total;
         }
     });
+
     return Object.entries(salesByDay)
       .map(([date, total]) => ({ date: format(parseISO(date), 'dd/MM'), fullDate: date, sales: total }))
       .sort((a, b) => parseISO(a.fullDate).getTime() - parseISO(b.fullDate).getTime());
-  }, [currentPeriodSales, dateRangeType, isLoadingSales, currentPeriodDateRange]);
+  // CORREÇÃO: Removida a dependência 'dateRangeType' daqui
+  }, [currentPeriodSales, isLoadingSales, currentPeriodDateRange]);
 
   const lowStockProducts = useMemo(() => {
     if (isLoadingProducts) return [];
-    return products.filter(product => product.stock <= product.minStock);
+    return products.filter((product: Product) => (product.stock || 0) <= (product.minStock || 0));
   }, [products, isLoadingProducts]);
 
   const totalSalesCount = useMemo(() => sales.length, [sales]);
@@ -106,15 +106,15 @@ const DashboardPage: React.FC = () => {
   const totalCustomersCount = useMemo(() => customers.length, [customers]);
   const overallTicketAverage = useMemo(() => {
     if (sales.length === 0) return 0;
-    return sales.reduce((sum, sale) => sum + sale.total, 0) / sales.length;
+    return sales.reduce((sum: number, sale: Sale) => sum + sale.total, 0) / sales.length;
   }, [sales]);
 
   const salesByCategoryChartData = useMemo(() => {
     if (isLoadingSales || isLoadingProducts) return [];
     const categorySales: { [key: string]: number } = {};
-    currentPeriodSales.forEach(sale => {
+    currentPeriodSales.forEach((sale: Sale) => {
       sale.items.forEach(item => {
-        const product = products.find(p => p.id === item.productId);
+        const product = products.find((p: Product) => p.id === item.productId);
         if (product) {
           const categoryName = product.customCategory || product.category;
           categorySales[categoryName] = (categorySales[categoryName] || 0) + item.subtotal;
@@ -142,7 +142,7 @@ const DashboardPage: React.FC = () => {
             <Button
               key={type}
               onClick={() => setDateRangeType(type)}
-              variant={dateRangeType === type ? 'primary' : 'outline'} // 'outline' para inativos
+              variant={dateRangeType === type ? 'primary' : 'outline'}
               size="sm"
               className={`capitalize ${dateRangeType !== type ? 'dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700' : ''}`}
             >
@@ -152,9 +152,7 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        {/* Card Receita */}
         <Card noPadding className="bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 text-white">
           <div className="p-4">
             <div className="flex items-center">
@@ -166,7 +164,6 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </Card>
-        {/* Card Despesas */}
         <Card noPadding className="bg-gradient-to-r from-slate-700 to-slate-800 dark:from-gray-700 dark:to-gray-800 text-white">
           <div className="p-4">
             <div className="flex items-center">
@@ -178,7 +175,6 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </Card>
-        {/* Card Saldo */}
         <Card noPadding className={`text-white ${financialSummary.balance >= 0 ? 'bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700' : 'bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700'}`}>
           <div className="p-4">
             <div className="flex items-center">
@@ -190,7 +186,6 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </Card>
-        {/* Card Total de Vendas */}
         <Card noPadding className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white">
           <div className="p-4">
             <div className="flex items-center">
@@ -204,19 +199,18 @@ const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Gráficos e Visão Geral */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 md:gap-6">
         <Card title={`Vendas (${financialSummary.period})`} className="lg:col-span-3" noPadding>
-          <div className="h-80 p-4"> {/* Adicionado p-4 aqui */}
+          <div className="h-80 p-4">
             {salesChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={salesChartData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}> {/* Ajustado left margin */}
+                <LineChart data={salesChartData} margin={{ top: 5, right: 20, left: -25, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} className="dark:stroke-gray-700"/>
                   <XAxis dataKey="date" tick={{ fontSize: 12, fill: 'currentColor' }} className="text-gray-600 dark:text-gray-400" />
                   <YAxis tickFormatter={(value) => formatCurrency(value)} tick={{ fontSize: 12, fill: 'currentColor' }} className="text-gray-600 dark:text-gray-400"/>
                   <Tooltip
-                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(4px)', borderRadius: '0.5rem', borderColor: '#e5e7eb' }} // Estilo do tooltip claro
-                    wrapperClassName="dark:![&_.recharts-tooltip-item]:!text-gray-800" // Força texto escuro no tooltip no dark mode
+                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(4px)', borderRadius: '0.5rem', borderColor: '#e5e7eb' }}
+                    wrapperClassName="dark:![&_.recharts-tooltip-item]:!text-gray-800"
                     formatter={(value: number) => [formatCurrency(value), 'Vendas']}
                   />
                   <Line type="monotone" dataKey="sales" stroke="#E41E26" strokeWidth={2} activeDot={{ r: 6, strokeWidth: 0, fill: '#E41E26' }} dot={{r:3, fill: '#E41E26'}} />
@@ -227,7 +221,7 @@ const DashboardPage: React.FC = () => {
         </Card>
 
         <Card title="Visão Geral" className="lg:col-span-2" noPadding>
-          <div className="space-y-3 p-4"> {/* Adicionado p-4 aqui */}
+          <div className="space-y-3 p-4">
             {[
               { icon: Package, label: "Total de Produtos", value: totalProductsCount },
               { icon: Users, label: "Total de Clientes", value: totalCustomersCount },
@@ -246,7 +240,6 @@ const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Produtos com Estoque Baixo e Vendas por Categoria */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <Card 
           title="Produtos com Estoque Baixo" 
@@ -259,7 +252,7 @@ const DashboardPage: React.FC = () => {
           }
         >
           {lowStockProducts.length > 0 ? (
-            <div className="overflow-x-auto max-h-60"> {/* Adicionado padding na tabela se noPadding no Card */}
+            <div className="overflow-x-auto max-h-60">
               <table className="min-w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
                   <tr>
@@ -269,7 +262,7 @@ const DashboardPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {lowStockProducts.map((product) => (
+                  {lowStockProducts.map((product: Product) => (
                     <tr key={product.id}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-gray-200">{product.name}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-center"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 dark:bg-red-500/30 dark:text-red-300">{product.stock}</span></td>
@@ -288,10 +281,10 @@ const DashboardPage: React.FC = () => {
         </Card>
 
         <Card title={`Vendas por Categoria (${financialSummary.period})`} noPadding>
-          <div className="h-80 p-4"> {/* Adicionado p-4 aqui */}
+          <div className="h-80 p-4">
             {salesByCategoryChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={salesByCategoryChartData} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}> {/* Aumentada margem esquerda */}
+                <BarChart data={salesByCategoryChartData} layout="vertical" margin={{ top: 5, right: 20, left: 90, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} className="dark:stroke-gray-700"/>
                   <XAxis type="number" tickFormatter={(value) => formatCurrency(value)} tick={{ fontSize: 10, fill: 'currentColor' }} className="text-gray-600 dark:text-gray-400"/>
                   <YAxis dataKey="name" type="category" width={90} interval={0} tick={{fontSize: 10, fill: 'currentColor', width: 85 }} className="text-gray-600 dark:text-gray-400 truncate"/>
