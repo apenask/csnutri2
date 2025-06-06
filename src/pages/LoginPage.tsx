@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth'; // <<-- CAMINHO CORRIGIDO
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 
 const LoginPage: React.FC = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -16,19 +16,19 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     setError('');
     
-    if (!username || !password) {
+    if (!email || !password) {
       setError('Por favor, preencha todos os campos.');
       return;
     }
 
     try {
       setIsLoading(true);
-      const success = await login(username, password);
+      const { success, error: loginError } = await login(email, password);
       
       if (success) {
         navigate('/dashboard');
       } else {
-        setError('Usuário ou senha inválidos.');
+        setError(loginError || 'Ocorreu um erro desconhecido.');
       }
     } catch (err) {
       setError('Ocorreu um erro ao tentar fazer login.');
@@ -60,14 +60,14 @@ const LoginPage: React.FC = () => {
             )}
             <div>
               <Input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
                 required
-                label="Usuário"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                label="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
@@ -94,29 +94,6 @@ const LoginPage: React.FC = () => {
               </Button>
             </div>
           </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">
-                  Credenciais de teste
-                </span>
-              </div>
-            </div>
-            <div className="mt-6 grid grid-cols-1 gap-3">
-              <div className="rounded-md bg-gray-50 p-3">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Admin:</span> Usuário: admin, Senha: admin123
-                </p>
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Usuário normal:</span> Usuário: user, Senha: user123
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
