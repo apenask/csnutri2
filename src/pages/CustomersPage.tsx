@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react'; 
-import { Plus, Search, Edit, Trash2, User, Users, Phone, Mail, Eye, RefreshCw } from 'lucide-react'; // Adicionado RefreshCw
+import { Plus, Search, Edit, Trash2, User, Users, Phone, Mail, Eye, RefreshCw } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { Customer, Sale } from '../types';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/useAuth';
 import { useCustomers } from '../context/CustomerContext';
 import { useSales } from '../context/SaleContext'; 
-import { useProducts } from '../context/ProductContext';
+import { useProducts } from '../context/useProducts';
 import { format, parseISO } from 'date-fns';
 import ConfirmationModal from '../components/ui/ConfirmationModal'; 
 
@@ -21,7 +21,7 @@ const CustomersPage: React.FC = () => {
     updateCustomer, 
     deleteCustomer, 
     isLoading: isLoadingCustomers,
-    getCustomerById: getCustomerFromContextById // Renomeado para evitar conflito
+    getCustomerById: getCustomerFromContextById
   } = useCustomers();
 
   const { getSalesByCustomerId, isLoading: isLoadingSales } = useSales();
@@ -41,7 +41,7 @@ const CustomersPage: React.FC = () => {
   const [formError, setFormError] = useState<string>(''); 
   const [pageMessage, setPageMessage] = useState<{type: 'success' | 'error', text: string} | null>(null); 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false); // Estado para o botão de recalcular
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   const [showDeleteCustomerModal, setShowDeleteCustomerModal] = useState(false); 
   const [customerIdToDelete, setCustomerIdToDelete] = useState<string | null>(null);
@@ -55,15 +55,16 @@ const CustomersPage: React.FC = () => {
     }
   }, [pageMessage]);
 
-  // Efeito para atualizar currentCustomer se ele mudar no contexto (após recalcular)
+  // CORREÇÃO: Lógica do useEffect melhorada para evitar loops e atender ao linter.
+  const customerId = currentCustomer?.id;
   useEffect(() => {
-    if (currentCustomer && currentCustomer.id) {
-      const updatedCustomerFromContext = getCustomerFromContextById(currentCustomer.id);
+    if (customerId) {
+      const updatedCustomerFromContext = getCustomerFromContextById(customerId);
       if (updatedCustomerFromContext) {
         setCurrentCustomer(updatedCustomerFromContext);
       }
     }
-  }, [customersFromContext, currentCustomer?.id, getCustomerFromContextById]);
+  }, [customersFromContext, customerId, getCustomerFromContextById]);
 
 
   const filteredCustomers = useMemo(() => {
@@ -164,10 +165,7 @@ const CustomersPage: React.FC = () => {
         setShowEditModal(false);
         setPageMessage({type: 'success', text: 'Cliente atualizado com sucesso!'});
       } else {
-        const payloadForAdd: Omit<Customer, 'id' | 'points' | 'totalPurchases' | 'totalSpent'> = {
-            ...customerDataPayload,
-        };
-        await addCustomer(payloadForAdd);
+        await addCustomer(customerDataPayload);
         setShowAddModal(false);
         setPageMessage({type: 'success', text: 'Cliente adicionado com sucesso!'});
       }
@@ -205,7 +203,6 @@ const CustomersPage: React.FC = () => {
         points: newPoints,
       });
       
-      // Força a atualização do currentCustomer no modal buscando os dados mais recentes do contexto
       const updatedCustomer = getCustomerFromContextById(currentCustomer.id);
       if (updatedCustomer) {
         setCurrentCustomer(updatedCustomer);
@@ -228,12 +225,14 @@ const CustomersPage: React.FC = () => {
 
   const formatCurrency = (value: number | undefined) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
   const formatDate = (dateString: string | undefined) => {
+    // CORREÇÃO: Removido o parâmetro 'e' não utilizado
     try { if (!dateString) return 'N/A'; return format(parseISO(dateString), 'dd/MM/yyyy'); } 
-    catch (e) { return dateString; }
+    catch { return dateString; }
   };
   const formatDateTime = (dateString: string | undefined) => {
+    // CORREÇÃO: Removido o parâmetro 'e' não utilizado
     try { if (!dateString) return 'N/A'; return format(parseISO(dateString), 'dd/MM/yyyy HH:mm'); }
-    catch (e) { return dateString; }
+    catch { return dateString; }
   };
   
   const getLastPurchaseDate = (customerId: string): string | undefined => {
@@ -475,10 +474,10 @@ const CustomersPage: React.FC = () => {
       )}
 
       <ConfirmationModal
-        isOpen={showDeleteCustomerModal} 
+        isOpen={showDeleteCustomerModal}
         onClose={() => {
-          if (!isSubmitting) { 
-            setShowDeleteCustomerModal(false); 
+          if (!isSubmitting) {
+            setShowDeleteCustomerModal(false);
             setCustomerIdToDelete(null);
           }
         }}
@@ -488,7 +487,7 @@ const CustomersPage: React.FC = () => {
         confirmButtonText="Excluir Cliente"
         confirmButtonVariant="danger"
         icon={Trash2}
-        isSubmitting={isSubmitting} 
+        isSubmitting={isSubmitting}
       />
     </div>
   );

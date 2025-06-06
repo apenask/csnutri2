@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import { useAuth } from './context/useAuth'; // <<-- CORRIGIDO
 
 // Layout
 import Layout from './components/layout/Layout';
@@ -18,7 +18,7 @@ const SuppliersPage = React.lazy(() => import('./pages/SuppliersPage'));
 const FinancePage = React.lazy(() => import('./pages/FinancePage'));
 const ReportsPage = React.lazy(() => import('./pages/ReportsPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
-const ProfilePage = React.lazy(() => import('./pages/ProfilePage')); // NOVA PÁGINA
+const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
 const SalesListPage = React.lazy(() => import('./pages/SalesListPage'));
 
 // Componente de Carregamento
@@ -47,7 +47,7 @@ function App() {
           <Route path="finance" element={<FinancePage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
-          <Route path="profile" element={<ProfilePage />} /> {/* NOVA ROTA */}
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
         
         <Route path="*" element={<NotFoundPage />} />
