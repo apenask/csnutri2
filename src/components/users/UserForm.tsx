@@ -2,22 +2,22 @@ import React, { useState, useEffect } from 'react';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import { User } from '../../types';
-import { navigationItems } from '../layout/Sidebar'; // Importando para as permissões
+import { navigationItems, NavigationItem } from '../../constants/navigation';
 
 export interface UserFormProps {
-  onSubmit: (userData: Omit<User, 'id' | 'points'>) => Promise<void>; // userData não deve ter id ou points
-  initialData?: Partial<User>; // Usar Partial<User> aqui
+  onSubmit: (userData: Omit<User, 'id' | 'points'>) => Promise<void>;
+  initialData?: Partial<User>;
   submitLabel?: string;
-  isLoading?: boolean; // Adicionada para controlar o estado de carregamento do botão
-  error?: string | null; // Adicionada para exibir erros de submissão
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 const UserForm: React.FC<UserFormProps> = ({
   onSubmit,
-  initialData, // Não precisa de valor padrão {}, useEffect cuida disso
+  initialData,
   submitLabel = 'Salvar',
   isLoading = false,
-  error: submitError // Renomeado para evitar conflito com estado local 'formError'
+  error: submitError
 }) => {
   const [formData, setFormData] = useState<Omit<User, 'id' | 'points'>>({
     name: '',
@@ -27,18 +27,18 @@ const UserForm: React.FC<UserFormProps> = ({
     role: 'user',
     permissions: initialData?.role === 'admin' ? undefined : (initialData?.permissions || [])
   });
-  const [formError, setFormError] = useState<string>(''); // Para erros de validação do formulário
+  const [formError, setFormError] = useState<string>('');
 
   useEffect(() => {
     setFormData({
       name: initialData?.name || '',
       email: initialData?.email || '',
       username: initialData?.username || '',
-      password: '', // Senha sempre limpa ao popular para edição ou novo
+      password: '',
       role: initialData?.role || 'user',
       permissions: initialData?.role === 'admin' ? undefined : (initialData?.permissions || []),
     });
-    setFormError(''); // Limpa erros locais ao popular
+    setFormError('');
   }, [initialData]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -59,13 +59,13 @@ const UserForm: React.FC<UserFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(''); 
+    setFormError('');
 
     if (!formData.name.trim() || !formData.username.trim() || !formData.email.trim()) {
       setFormError("Nome, nome de usuário e email são obrigatórios.");
       return;
     }
-    if (!initialData?.id && !formData.password) { 
+    if (!initialData?.id && !formData.password) {
       setFormError("Senha é obrigatória para novos usuários.");
       return;
     }
@@ -73,16 +73,12 @@ const UserForm: React.FC<UserFormProps> = ({
       setFormError("A (nova) senha deve ter pelo menos 6 caracteres.");
       return;
     }
-    
-    const dataToSubmit = { 
+
+    const dataToSubmit = {
         ...formData,
-        // Se for admin, as permissões granulares não se aplicam no objeto User (ele tem todas)
-        // O UserContext pode tratar permissions como undefined para admin
-        permissions: formData.role === 'admin' ? undefined : formData.permissions 
+        permissions: formData.role === 'admin' ? undefined : formData.permissions
     };
-    
-    // Se for edição e a senha não foi alterada (campo password está vazio)
-    // removemos a propriedade password para não sobrescrever a senha hashada existente com uma vazia.
+
     if (initialData?.id && !formData.password) {
         delete (dataToSubmit as Partial<User>).password;
     }
@@ -106,15 +102,15 @@ const UserForm: React.FC<UserFormProps> = ({
       <Input label="Nome Completo" type="text" name="name" value={formData.name} onChange={handleInputChange} required fullWidth />
       <Input label="Email" type="email" name="email" value={formData.email} onChange={handleInputChange} required fullWidth />
       <Input label="Nome de Usuário (login)" type="text" name="username" value={formData.username} onChange={handleInputChange} required fullWidth />
-      <Input 
-        label="Senha" 
-        type="password" 
-        name="password" 
-        value={formData.password} 
-        onChange={handleInputChange} 
-        required={!initialData?.id} 
+      <Input
+        label="Senha"
+        type="password"
+        name="password"
+        value={formData.password}
+        onChange={handleInputChange}
+        required={!initialData?.id}
         placeholder={initialData?.id ? 'Deixe em branco para manter a senha atual' : 'Mínimo 6 caracteres'}
-        fullWidth 
+        fullWidth
       />
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Usuário</label>
@@ -129,8 +125,8 @@ const UserForm: React.FC<UserFormProps> = ({
         <div className="pt-2">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Permissões de Acesso às Abas:</label>
           <div className="space-y-2 max-h-48 overflow-y-auto p-2 border dark:border-gray-600 rounded-md bg-white dark:bg-gray-700/30">
-            {navigationItems.map(perm => (
-              (perm.href !== '/settings') && ( 
+            {navigationItems.map((perm: NavigationItem) => (
+              (perm.href !== '/settings') && (
                 <label key={perm.href} className="flex items-center space-x-3 text-sm text-gray-700 dark:text-gray-300 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-600/50">
                   <input
                     type="checkbox"

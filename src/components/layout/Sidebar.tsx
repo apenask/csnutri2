@@ -1,52 +1,28 @@
-import React, { useMemo, useState } from 'react'; // Adicionado useState
+import React, { useMemo, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
-import ConfirmationModal from '../ui/ConfirmationModal'; // Importado
-import { 
-  Home, ShoppingCart, ListOrdered, Package, Users as UsersIcon, Truck, 
-  DollarSign, FileText, Settings, User, LogOut // LogOut já estava importado
-} from 'lucide-react';
-
-export interface NavigationItem {
-  name: string;
-  icon: React.ElementType;
-  href: string;
-}
-
-export const navigationItems: NavigationItem[] = [
-  { name: 'Dashboard', icon: Home, href: '/dashboard' },
-  { name: 'PDV', icon: ShoppingCart, href: '/pos' },
-  { name: 'Vendas', icon: ListOrdered, href: '/sales' }, 
-  { name: 'Produtos', icon: Package, href: '/products' },
-  { name: 'Clientes', icon: UsersIcon, href: '/customers' },
-  { name: 'Fornecedores', icon: Truck, href: '/suppliers' },
-  { name: 'Financeiro', icon: DollarSign, href: '/finance' },
-  { name: 'Relatórios', icon: FileText, href: '/reports' },
-];
+import { useAuth } from '../../context/useAuth';
+import ConfirmationModal from '../ui/ConfirmationModal';
+import { Settings, User, LogOut } from 'lucide-react';
+import { navigationItems } from '../../constants/navigation'; // IMPORTANDO DO ARQUIVO SEPARADO
 
 interface SidebarProps {
-  isMobile?: boolean; // Adicionado para controle de fechamento no mobile, se necessário
-  onClose?: () => void; // Adicionado para fechar no mobile
+  isMobile?: boolean;
+  onClose?: () => void;
 }
-
 
 const Sidebar: React.FC<SidebarProps> = ({ isMobile, onClose }) => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // Para o estado de loading do botão
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const requestLogout = () => {
     setShowLogoutConfirmModal(true);
   };
 
   const handleConfirmLogout = () => {
-    setIsLoggingOut(true); // Ativa o loading
-    // Não é necessário fechar o modal aqui, pois o logout redirecionará
-    // e o componente será desmontado ou o estado de autenticação mudará.
-    logout(); 
-    // setIsLoggingOut(false); // Não será alcançado se o logout redirecionar imediatamente
-    // setShowLogoutConfirmModal(false); // Também não é estritamente necessário
+    setIsLoggingOut(true);
+    logout();
   };
 
   const filteredNavigation = useMemo(() => {
@@ -77,7 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile, onClose }) => {
               <NavLink
                 key={item.name}
                 to={item.href}
-                onClick={handleLinkClick} // Fecha sidebar no mobile ao clicar
+                onClick={handleLinkClick}
                 className={({ isActive }) =>
                   `group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
                     isActive ? 'bg-red-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'
@@ -126,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile, onClose }) => {
               <p className="text-xs text-gray-400 capitalize">{currentUser?.role}</p>
             </div>
             <button 
-              onClick={requestLogout} // Alterado para requestLogout
+              onClick={requestLogout}
               className="ml-2 p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-white"
               title="Sair da conta"
             >
@@ -139,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile, onClose }) => {
       <ConfirmationModal
         isOpen={showLogoutConfirmModal}
         onClose={() => {
-            if (!isLoggingOut) { // Permite fechar apenas se não estiver em processo de logout
+            if (!isLoggingOut) {
                 setShowLogoutConfirmModal(false);
             }
         }}
@@ -149,7 +125,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobile, onClose }) => {
         confirmButtonText="Sair"
         confirmButtonVariant="danger"
         icon={LogOut}
-        isSubmitting={isLoggingOut} // Passa o estado de loading
+        isSubmitting={isLoggingOut}
       />
     </>
   );
