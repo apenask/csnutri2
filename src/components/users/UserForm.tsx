@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import { User } from '../../types';
+// Update the import path below to the correct location if needed
 import { navigationItems, NavigationItem } from '../../constants/navigation';
+// If the file does not exist, create 'src/constants/navigation.ts' and export navigationItems and NavigationItem from there.
 
 export interface UserFormProps {
   onSubmit: (userData: Omit<User, 'id' | 'points'>) => Promise<void>;

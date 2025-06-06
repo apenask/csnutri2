@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/useAuth'; // <<-- CORRIGIDO
 import { Outlet, Navigate } from 'react-router-dom';
 
 const Layout: React.FC = () => {
@@ -13,8 +13,7 @@ const Layout: React.FC = () => {
   }
 
   return (
-    // Fundo geral do layout - um cinza bem escuro para o modo dark
-    <div className="flex h-screen bg-white dark:bg-gray-900"> {/* Alterado bg-gray-100 para bg-white no modo claro para maior contraste com cards cinza escuro */}
+    <div className="flex h-screen bg-white dark:bg-gray-900">
       
       <div className="hidden md:flex md:flex-shrink-0">
         <Sidebar /> 
@@ -24,10 +23,10 @@ const Layout: React.FC = () => {
       {sidebarOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div 
-            className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-black dark:bg-opacity-80" // Aumentada opacidade do overlay escuro
+            className="fixed inset-0 bg-gray-600 bg-opacity-75 dark:bg-black dark:bg-opacity-80"
             onClick={() => setSidebarOpen(false)}
           ></div>
-          <div className="relative flex flex-col flex-1 w-full max-w-xs bg-gray-800 dark:bg-black"> {/* Sidebar mobile um pouco mais clara no modo claro, preta no escuro */}
+          <div className="relative flex flex-col flex-1 w-full max-w-xs bg-gray-800 dark:bg-black">
             <div className="absolute top-0 right-0 -mr-12 pt-2">
               <button
                 type="button"
@@ -48,7 +47,6 @@ const Layout: React.FC = () => {
       {/* Conteúdo Principal */}
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <Header openSidebar={() => setSidebarOpen(true)} /> 
-        {/* Área de conteúdo principal - um cinza claro no modo claro, e o mesmo cinza escuro do layout no modo dark */}
         <main className="flex-1 relative overflow-y-auto focus:outline-none bg-gray-100 dark:bg-gray-900"> 
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
