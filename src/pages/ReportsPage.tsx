@@ -66,7 +66,7 @@ const ReportsPage: React.FC = () => {
   const formatDateDisplay = (dateString: string | undefined): string => {
     if (!dateString) return 'N/A';
     try { return format(parseISO(dateString), 'dd/MM/yyyy', { locale: ptBR }); } 
-    catch (e) { 
+    catch { 
       return dateString; 
     }
   };
